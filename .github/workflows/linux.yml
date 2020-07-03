@@ -1,0 +1,55 @@
+name: linux
+
+on: 
+  push:
+
+jobs:
+
+  build-linux:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: setup
+      run: |
+        sudo apt update
+        export CC=gcc-8
+        export CXX=g++-8
+        cd ../..
+        git clone https://github.com/open-ephys/plugin-GUI.git
+        cd plugin-GUI/Build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ..
+        cd ../Resources/Scripts
+        sudo ./install_linux_dependencies.sh
+    - name: build
+      run: |
+        cd Build
+        cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ..
+        make
+
+# TODO: Perform some basic testing before publishing...
+#    - name: test
+#      run: cd build && ctest
+    - name: deploy
+      env:
+        bintrayUser: ${{ secrets.bintrayUsername }}
+        bintrayApiKey: ${{ secrets.bintrayApiKey }}
+        build_dir: "Build"
+        repo: ${{ github.event.repository.name }}
+        package: ${{ github.event.repository.name }}-linux
+      run: |
+        plugin_api=$(grep -rnw ../../plugin-GUI/Source -e '#define PLUGIN_API_VER' | grep -Eo "[0-9]*" | tail -1)
+        tag=$(git describe --tags $(git rev-list --tags --max-count=1))
+        new_plugin_ver=$tag-API$plugin_api
+        mkdir plugins 
+        cp -r $build_dir/*.so plugins
+        mkdir shared
+        cp -r libs/linux/bin/* shared
+        zipfile=${package}_${new_plugin_ver}.zip
+        zip -r -X $zipfile plugins shared
+        user_info="$bintrayUser:$bintrayApiKey"
+        curl -T $zipfile --user $user_info https://api.bintray.com/content/$bintrayUser/$repo/$package/$new_plugin_ver/$zipfile
+        curl -X POST --user $user_info https://api.bintray.com/content/$bintrayUser/$repo/$package/$new_plugin_ver/publish
