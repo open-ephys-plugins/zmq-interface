@@ -57,10 +57,10 @@ jobs:
         new_plugin_ver=$tag-API$plugin_api
         mkdir plugins
         cp $build_dir/*.dll plugins
-        if [ -d "Resources" ]
+        if [ -d "libs" ]
         then
           mkdir shared
-          cp Resources/*.dll shared
+          cp libs/windows/bin/x64/*.dll shared
         fi
         zipfile=${package}_${new_plugin_ver}.zip
         powershell Compress-Archive -Path "plugins" -DestinationPath ${zipfile}
