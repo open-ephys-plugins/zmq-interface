@@ -57,17 +57,8 @@ jobs:
         new_plugin_ver=$tag-API$plugin_api
         mkdir plugins
         cp $build_dir/*.dll plugins
-        if [ -d "libs" ]
-        then
-          mkdir shared
-          cp libs/windows/bin/x64/*.dll shared
-        fi
         zipfile=${package}_${new_plugin_ver}.zip
         powershell Compress-Archive -Path "plugins" -DestinationPath ${zipfile}
-        if [ -d "shared" ]
-        then
-          powershell Compress-Archive -U -Path "shared" -DestinationPath ${zipfile}
-        fi
         user_info="$bintrayUser:$bintrayApiKey"
         curl -T $zipfile --user $user_info https://api.bintray.com/content/$bintrayUser/$repo/$package/$new_plugin_ver/$zipfile
         curl -X POST --user $user_info https://api.bintray.com/content/$bintrayUser/$repo/$package/$new_plugin_ver/publish
