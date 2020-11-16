@@ -1,0 +1,4 @@
+  - cmake >= 3.11
+  - pkgconfig
+  - pyzmq
+  - zeromq

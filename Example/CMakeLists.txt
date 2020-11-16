@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.11)
 Project(OpenEphysZMQReader)
 
 include(FetchContent)
@@ -35,10 +35,8 @@ if(NOT json_POPULATED)
 endif()
 
 
-
-
 add_library(ZMQReader ZMQReader.cpp)
-target_link_libraries(ZMQReader nlohmann_json::nlohmann_json)
+target_link_libraries(ZMQReader nlohmann_json::nlohmann_json cppzmq)
 
 add_executable(OpenEphysZMQReader main.cpp)
 target_link_libraries(OpenEphysZMQReader ZMQReader)

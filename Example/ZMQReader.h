@@ -2,19 +2,29 @@
 #ifndef ZMQ_READER_H
 #define ZMQ_READER_H
 
+
+#include <iostream>
+#include <nlohmann/json.hpp>
 #include <deque>
 #include <string>
 #include <zmq.hpp>
-#include <iostream>
-#include <nlohmann/json.hpp>
-using json = nlohmann::json;
+
 typedef std::deque<std::string> zmq_frames;
+using json = nlohmann::json;
+
+bool recv_multi(zmq::socket_t &socket, zmq_frames &frames);
 
 class ZMQReader {
 public:
-  ZMQReader(std::string address= "127.0.0.1", int port=5556): port_(port), address_(address){
-    connectSocket();
-    Process();
+
+  ZMQReader(const std::vector<int> channel, std::string address="127.0.0.1", int port= 5556): port_(port), address_(address){
+    count_missed_packet_ = 0;
+    count_packet_ = 0;
+    for (auto &chan : channel) {
+      samples_[chan] = new std::vector<float>();
+    }
+    timestamps_ = new std::vector<uint64_t>();
+
   }
 
   ~ZMQReader(){closeSocket();}
@@ -23,28 +33,28 @@ public:
   void Process();
 
   // Connect socket
-  void connectSocket();
+  bool connectSocket(zmq::context_t& context_);
   void closeSocket();
 
   // Read data
-  bool readData(zmq_frames frames);
+  bool readData(std::string data);
   // Read Params
   bool readParams(zmq_frames frames);
   // Read Events
-  bool readEvents(zmq_frames frames);
+  bool readEvents(const zmq_frames& frames);
   // Read Spikes
-  bool readSpikes(zmq_frames frames);
+  bool readSpikes(const zmq_frames& frames);
 
   // Read/Check header - missed packets
-  void checkHeader(json header);
+  std::string checkHeader(const std::string& header_frame);
 
-private:
-  int port_;
-  std::string address_;
   zmq::socket_t socket_;
-
+  std::string address_= "127.0.0.1";
+  int port_=5556;
+private:
+  json header;
   std::map<int, std::vector<float> *> samples_;
-  std::deque<uint64_t> timestamps_;
+  std::vector<uint64_t>* timestamps_;
 
   int count_packet_;
   int count_missed_packet_;
@@ -55,14 +65,12 @@ private:
 class ZMQRegister{
 
   ZMQRegister(std::string application_name, std::string uuid, int port=5557): port_(port){
-    connectSocket();
-    Process();
   }
   void Process();
   // register the app in open-ephys
 
   // Connect socket
-  void connectSocket();
+  void connectSocket(zmq::context_t context);
   void closeSocket();
 
   // ping every 2secs
@@ -74,5 +82,6 @@ private:
   int port_;
 
 };
+
 
 #endif // ZMQ_READER_H
