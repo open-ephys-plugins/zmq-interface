@@ -13,26 +13,28 @@ Dependencies installed through CMake Fetch_Content
 
 ## Build 
 
-- Activate the environment
+Activate the environment
 
 ```
-    mkdir build
-    cd build
-    cmake ..
-    make
-    mkdir build
-    ./OpenEphysZMQReader
+mkdir build
+cd build
+cmake ..
+make
+mkdir build
+./OpenEphysZMQReader
 ```
-
-## How to use it - Receive data
 
 Turn On Open Ephys GUI with a ZMQ node. 
 
-Input data to modify = 
+## How to use it - Receive data
+
+*See class ZMQReader*
+
+Input data to modify:
 
 ```
-  std::vector<int> channels= {1};
-  ZMQReader reader(channels,  "127.0.0.1", 5556);
+std::vector<int> channels= {1};
+ZMQReader reader(channels,  "127.0.0.1", 5556);
 ```
 - Ip address =  127.0.0.1 (fixed by OpenEphys for the moment)
 - Port address = 5556 (fixed by OpenEphys for the moment)
@@ -40,20 +42,24 @@ Input data to modify =
 
 Output data = 
 
-- reader.samples_ (std::map<int, std::vector<float>>) = map channel integer with a std::vector filled with the data send by Open-Ephys GUI
-- reader.timestamps_ (std::vector<uint64_t>) = timestamps for each samples
+- reader.samples (std::map<int, std::vector<float>>) = map channel integer with a std::vector filled with the data send by Open-Ephys GUI
+- reader.timestamps (std::vector<uint64_t>) = timestamps for each samples
+- reader.spike (std::vector<Event>) = Data structure with info for each received spike
+- reader.event(std::vector<Event>)  = Data structure with info for each received event
 
 You should then see this type of output in the example project : 
 
 ```
---- Connect the reader ---
---- Connect socket ---
---- Start reading data ---
-{"content":{"n_channels":16,"n_real_samples":928,"n_samples":1024,"sample_rate":40000,"timestamp":20574688},"data_size":65536,"message_no":159892,"type":"data"}
-Received first valid data packet (TS = 20574688).
-Data size: 928
-{"content":{"n_channels":16,"n_real_samples":928,"n_samples":1024,"sample_rate":40000,"timestamp":20575616},"data_size":65536,"message_no":159893,"type":"data"}
-Data size: 1856
+--- Start reading message ---
+New message: {"content":{"n_channels":16,"n_real_samples":928,"n_samples":1024,"sample_rate":40000,"timestamp":132704},"data_size":65536,"message_no":2372,"type":"data"}
+Received first valid data packet (TS = 132704).
+928 samples has been collected in the buffer for future processing.
+
+New message: {"content":{"n_channels":16,"n_real_samples":928,"n_samples":1024,"sample_rate":40000,"timestamp":133632},"data_size":65536,"message_no":2373,"type":"data"}
+1856 samples has been collected in the buffer for future processing.
+
+New message: {"content":{"n_channels":16,"n_real_samples":928,"n_samples":1024,"sample_rate":40000,"timestamp":134560},"data_size":65536,"message_no":2374,"type":"data"}
+2784 samples has been collected in the buffer for future processing.
 ...
 ```
 
@@ -62,18 +68,18 @@ For each received message, n_real_samples are added to the samples_ buffer.
 #### Data message
 
 A data message is send in 3 frames : 
-- type
+- type: DATA
 - header in JSON Format: 
     ```
-        content:
-            n_channels: 16
-            n_real_samples: 928
-            n_samples: 1024
-            sample_rate: 40000
-            timestamp: 20576544
-        data_size: 65536
-        message_no: 159894
-        type: data
+    content:
+        n_channels: 16
+        n_real_samples: 928
+        n_samples: 1024
+        sample_rate: 40000
+        timestamp: 20576544
+    data_size: 65536
+    message_no: 159894
+    type: data
     ```
 - data buffer 
 
@@ -88,14 +94,26 @@ stop index = n_samples * channel_number + n_real_samples
 n_samples is fixed by the ZMQ Open-Ephys node while the n_real_samples is in function of the Open-Ephys source.
 
 
-#### Event message
-TBD
+#### Event / Spike message
 
-#### Spike message
-TBD
+A event/spike message is send in 3 frames : 
+- type
+- header in JSON Format: 
+    ```
+    content:
+        sample_num: sampleNum (number),
+        event_id: id (number),
+        event_channel: channel (number),
+        timestamp: sample id (number)
+    data_size: 65536
+    message_no: 159894
+    type: event
+    ```
 
 
-## How to register the app in OpenEphys 
+## How to register the app in OpenEphys
+
+*See class ZMQRegister*
 
 Send a heartbeat every 2secs with this JSON message format :
 
@@ -106,3 +124,6 @@ type: heartbeat
 ```
 
 Then receive a confirmation message. 
+```
+heartbeat received
+```

@@ -35,7 +35,7 @@ if(NOT json_POPULATED)
 endif()
 
 
-add_library(ZMQReader ZMQReader.cpp)
+add_library(ZMQReader ZMQReader.cpp ZMQRegister.cpp)
 target_link_libraries(ZMQReader nlohmann_json::nlohmann_json cppzmq)
 
 add_executable(OpenEphysZMQReader main.cpp)
