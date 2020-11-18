@@ -24,16 +24,9 @@ bool ZMQRegister::pingOpenEphys() {
     std::memcpy(message.data(), msg.data(), msg.size());
     if (zmq_msg_send(reinterpret_cast<zmq_msg_t *>(&message), socket, 0)) {
         zmq::message_t answer;
-        if (!zmq_recvmsg(socket,
-                         reinterpret_cast<zmq_msg_t *>(&answer),
-                         0)) {
-            return false;
-        } else {
-            std::cout << std::string(static_cast<char *>(answer.data()), answer.size()) << std::endl;
-            return true;
-        }
-
+        zmq_msg_recv(reinterpret_cast<zmq_msg_t *>(&answer), socket, 0);
+        std::cout << std::string(static_cast<char *>(answer.data()), answer.size()) << std::endl;
+        return true;
     }
     return false;
-
 }

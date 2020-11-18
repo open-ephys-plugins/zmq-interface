@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
 
         }
 
-        zmq_frames msg;
+        std::deque<std::string> msg;
         if (reader.recv(msg)) {
             std::string type = reader.checkHeader(msg[1]);
 

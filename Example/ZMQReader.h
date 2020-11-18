@@ -8,7 +8,7 @@
 #include <string>
 #include <zmq.hpp>
 
-typedef std::deque<std::string> zmq_frames;
+
 using json = nlohmann::json;
 
 const int MIN_FRAME_NBR = 2;
@@ -32,7 +32,7 @@ public:
     ~ZMQReader() { closeSocket(); }
 
     /** Wait to receive multiframes messages **/
-    bool recv(zmq_frames &frames);
+    bool recv(std::deque<std::string> &frames);
 
     /** Connect the socket as a Subscriber to the communication **/
     bool connectSocket(zmq::context_t &context_);

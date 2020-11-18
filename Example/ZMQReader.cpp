@@ -4,19 +4,14 @@
 #include <unistd.h>
 
 
-bool ZMQReader::recv(zmq_frames &frames) {
+bool ZMQReader::recv(std::deque<std::string> &frames) {
 
     zmq::message_t message;
     int64_t rcvmore = 0;
     size_t type_size = sizeof(int64_t);
 
     do {
-        if (!zmq_recvmsg(socket,
-                         reinterpret_cast<zmq_msg_t *>(&message),
-                         0)) {
-            return false;
-        }
-
+        zmq_msg_recv(reinterpret_cast<zmq_msg_t *>(&message), socket, 0);
         frames.push_back(std::string(static_cast<char *>(message.data()),
                                         message.size()));
 
