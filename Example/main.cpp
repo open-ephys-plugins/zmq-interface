@@ -5,8 +5,7 @@
 
 int main(int argc, char **argv) {
 
-    std::vector<int> channels = {1};
-    ZMQReader reader(channels, "127.0.0.1", 5556);
+    ZMQReader reader("127.0.0.1", 5556);
     ZMQRegister heartbeat("example", "11111111", "127.0.0.1", 5557);
 
 
@@ -45,8 +44,18 @@ int main(int argc, char **argv) {
             if (type == "data") {
                 reader.readData(msg[2]);
             } else if (type == "spike" or type == "event") {
-                reader.readEvents(msg);
+                reader.readEvents(msg[2]);
             }
+        }
+
+        // use the data
+        std::vector<float> data;
+        uint channel = 1;
+        uint n_samples = 10;
+        if(reader.get_channel_data(channel, n_samples,  data)){
+            std::cout << "Use the " << data.size() << " first samples of the channel 1 here." << std::endl;
+        }else{
+            std::cout << "Not yet enough data to stream." << std::endl;
         }
 
 
