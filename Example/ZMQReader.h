@@ -14,10 +14,10 @@ using json = nlohmann::json;
 const int MIN_FRAME_NBR = 2;
 
 struct Event {
-    uint sample_num;
-    uint event_id;
-    uint event_channel;
-    uint ts;
+    unsigned int sample_num;
+    unsigned int event_id;
+    unsigned int event_channel;
+    unsigned int ts;
     std::vector<uint8_t> *data;
 };
 
@@ -106,13 +106,13 @@ public:
     void readEvents(const std::string &data);
 
     /** get from the buffer n_sample from the specified channel **/
-    bool get_channel_data(uint channel, uint n_sample, std::vector<float> &data);
+    bool get_channel_data(unsigned intchannel, unsigned intn_sample, std::vector<float> &data);
 
     /** get the n last events **/
-    bool get_events(uint n_events, std::vector<Event> &event);
+    bool get_events(unsigned intn_events, std::vector<Event> &event);
 
     /** get the n last spikes **/
-    bool get_spikes(uint n_spikes, std::vector<Event> &spikes);
+    bool get_spikes(unsigned intn_spikes, std::vector<Event> &spikes);
 
 private:
     json header;
@@ -125,10 +125,10 @@ private:
     std::vector<Event> *spikes;
     std::vector<Event> *events;
 
-    uint count_packet = 0;
-    uint count_missed_packet = 0;
-    uint valid_packet_counter = 0;
-    uint last_message_number = 0;
+    unsigned int count_packet = 0;
+    unsigned int count_missed_packet = 0;
+    unsigned int valid_packet_counter = 0;
+    unsigned int last_message_number = 0;
 };
 
 

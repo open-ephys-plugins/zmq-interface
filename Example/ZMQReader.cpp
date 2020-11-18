@@ -13,7 +13,7 @@ bool ZMQReader::recv(std::deque<std::string> &frames) {
     do {
         zmq_msg_recv(reinterpret_cast<zmq_msg_t *>(&message), socket, 0);
         frames.push_back(std::string(static_cast<char *>(message.data()),
-                                        message.size()));
+                                     message.size()));
 
         socket.getsockopt(ZMQ_RCVMORE, &rcvmore, &type_size);
     } while (rcvmore != 0);
@@ -51,7 +51,7 @@ void ZMQReader::closeSocket() {
 std::string ZMQReader::checkHeader(const std::string &header_frame) {
     header = json::parse(header_frame);
 
-    std::cout << "New message: " <<  header << std::endl;
+    std::cout << "New message: " << header << std::endl;
 
     valid_packet_counter++;
 
@@ -62,7 +62,7 @@ std::string ZMQReader::checkHeader(const std::string &header_frame) {
 
     } else if (last_message_number + 1 !=
                header["message_no"].get<uint>()) { // Missed packet
-        uint nbr_missed_packet =
+        unsigned int nbr_missed_packet =
                 header["message_no"].get<uint>() - last_message_number + 1;
         std::cout << ". Packet message lost: " << nbr_missed_packet << std::endl;
         count_missed_packet = count_missed_packet + nbr_missed_packet;
@@ -77,18 +77,18 @@ void ZMQReader::readData(std::string &data) {
 
 
     // First data packet - initiate the structure
-    if(samples.empty()){
-        for (int chan=0; chan<header["content"]["n_channels"].get<uint>(); chan++) {
+    if (samples.empty()) {
+        for (int chan = 0; chan < header["content"]["n_channels"].get<uint>(); chan++) {
             samples[chan] = new std::vector<float>();
         }
         timestamps = new std::vector<uint64_t>();
     }
 
     // Data
-    uint n_samples = header["content"]["n_samples"].get<uint>();
-    uint n_real_samples = header["content"]["n_real_samples"].get<uint>();
-    uint sample_rate = header["content"]["sample_rate"].get<uint>();
-    uint init_ts = header["content"]["timestamp"].get<uint>();
+    unsigned int n_samples = header["content"]["n_samples"].get<uint>();
+    unsigned int n_real_samples = header["content"]["n_real_samples"].get<uint>();
+    unsigned int sample_rate = header["content"]["sample_rate"].get<uint>();
+    unsigned int init_ts = header["content"]["timestamp"].get<uint>();
 
     // copy data onto buffers for each configured channel group
     for (auto &it : samples) {
@@ -111,7 +111,7 @@ void ZMQReader::readData(std::string &data) {
 
     timestamps->insert(timestamps->end(), ts.begin(), ts.end());
 
-    std::cout  << timestamps->size() << " samples has been collected in the buffer for future processing." << std::endl;
+    std::cout << timestamps->size() << " samples has been collected in the buffer for future processing." << std::endl;
 
 }
 
@@ -133,25 +133,27 @@ void ZMQReader::readEvents(const std::string &data) {
     }
 }
 
-bool ZMQReader::get_channel_data(uint channel, uint n_samples, std::vector<float> &data){
-    if(samples[channel]->size() < n_samples){
+bool ZMQReader::get_channel_data(unsigned int channel, unsigned int n_samples, std::vector<float> &data) {
+    if (samples[channel]->size() < n_samples) {
         return false;
     }
     auto start = samples[channel]->begin();
-    data.insert(data.end(), start, start+ n_samples);
+    data.insert(data.end(), start, start + n_samples);
     samples[channel]->erase(start, start + n_samples);
     return true;
 }
-bool ZMQReader::get_events(uint n_events, std::vector<Event> &event){
-    if(events->size() < n_events){
-       return false;
+
+bool ZMQReader::get_events(unsigned int n_events, std::vector<Event> &event) {
+    if (events->size() < n_events) {
+        return false;
     }
     auto start = events->begin();
     event.insert(event.begin(), start, start + n_events);
     return true;
 }
-bool ZMQReader::get_spikes(uint n_spikes, std::vector<Event> &spike){
-    if(spikes->size() < n_spikes){
+
+bool ZMQReader::get_spikes(unsigned int n_spikes, std::vector<Event> &spike) {
+    if (spikes->size() < n_spikes) {
         return false;
     }
     auto start = spikes->begin();
