@@ -66,6 +66,7 @@ private:
     OwnedArray<ZmqApplication> *getApplicationList();
     ZmqInterface *ZmqProcessor;
     ZmqInterfaceEditorListBox *listBox;
+    Label *listTitle;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ZmqInterfaceEditor)
 
     

@@ -143,7 +143,8 @@ private:
                   int64 timestamp);
     int sendSpikeEvent(const SpikeChannel* spikeInfo, const MidiMessage &event);
     
-    int receiveEvents(MidiBuffer &events);
+    // Currently only supports events related to keeping track of connected Applications
+    int receiveEvents();
     void checkForApplications();
     
     template<typename T> int sendParam(String name, T value);

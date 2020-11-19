@@ -665,7 +665,7 @@ void ZmqInterface::handleSpike(const SpikeChannel* spikeInfo, const MidiMessage&
     sendSpikeEvent(spikeInfo, event);
 }
 
-int ZmqInterface::receiveEvents(MidiBuffer& events)
+int ZmqInterface::receiveEvents()
 {
     
     EventData ed;
@@ -786,9 +786,7 @@ void ZmqInterface::process(AudioSampleBuffer& buffer)
     sendData(*(buffer.getArrayOfWritePointers()), buffer.getNumChannels(), 
         buffer.getNumSamples(), getNumSamples(0), firstTs, (int)sampleRate);
 
-#if 0
-    receiveEvents(events);
-#endif
+    receiveEvents();
     checkForApplications();
 }
 

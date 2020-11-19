@@ -95,12 +95,12 @@ public:
                 
             const int x = getTickX();
             
-            g.setFont (height * 0.6f);
+            g.setFont (height * 0.7f);
             if (i->alive)
                 g.setColour(Colours::green);
             else
                 g.setColour(Colours::red);
-            g.drawText (item, x, 0, width - x - 2, height, Justification::centredLeft, true);
+            g.drawText (item, 10, 0, width - x - 2, height, Justification::centredLeft, true);
         } // end of function
     }
     
@@ -110,15 +110,12 @@ public:
         selectRow (row);
     }
     
-    void paint (Graphics& g) override
+    void paintOverChildren (Graphics& g) override
     {
-        ListBox::paint (g);
-        g.setColour (Colours::grey);
-        g.setGradientFill(backgroundGradient);
         if (editor->getApplicationList()->size() == 0)
         {
-            g.setColour (Colours::grey);
-            g.setFont (13.0f);
+            g.setColour (Colours::darkgrey);
+            g.setFont (14.0f);
             g.drawText (noItemsMessage,
                         0, 0, getWidth(), getHeight() / 2,
                         Justification::centred, true);
@@ -148,9 +145,16 @@ private:
 ZmqInterfaceEditor::ZmqInterfaceEditor(GenericProcessor *parentNode, bool useDefaultParameters): GenericEditor(parentNode, useDefaultParameters)
 {
     ZmqProcessor = (ZmqInterface *)parentNode;
-    listBox = new ZmqInterfaceEditorListBox(String("no app connected"), this);
-    listBox->setBounds(2,25,130,105);
+    listBox = new ZmqInterfaceEditorListBox(String("No App connected"), this);
+    listBox->setBounds(2,45,130,85);
     addAndMakeVisible(listBox);
+
+    listTitle = new Label();
+    listTitle->setText("List of connected apps:", dontSendNotification);
+    listTitle->setColour(Label::textColourId, Colours::black);
+    listTitle->setBounds(2,27,130,15);
+    listTitle->setFont(Font("FiraSans Bold", 14, Font::plain));
+    addAndMakeVisible(listTitle);
 #if 0
     dataPortEditor = new TextEditor("dataport");
     addAndMakeVisible(dataPortEditor);

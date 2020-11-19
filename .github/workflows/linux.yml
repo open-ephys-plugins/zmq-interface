@@ -31,6 +31,7 @@ jobs:
 #    - name: test
 #      run: cd build && ctest
     - name: deploy
+      if: github.ref == 'refs/heads/master'
       env:
         bintrayUser: ${{ secrets.bintrayUsername }}
         bintrayApiKey: ${{ secrets.bintrayApiKey }}
