@@ -6,6 +6,10 @@ Minimal project to read data send by  OpenEphys ZMQ node.
 
 see requirement.txt - Install in anaconda or a pip environment 
 
+```
+sudo apt-get install libzmq3-dev
+```
+
 Dependencies installed through CMake Fetch_Content 
 - CPPzmq
 - json lib
