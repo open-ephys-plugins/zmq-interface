@@ -50,8 +50,8 @@ int main(int argc, char **argv) {
 
         // use the data
         std::vector<float> data;
-        unsigned intchannel = 1;
-        unsigned intn_samples = 10;
+        unsigned int channel = 1;
+        unsigned int n_samples = 10;
         if(reader.get_channel_data(channel, n_samples,  data)){
             std::cout << "Use the " << data.size() << " first samples of the channel 1 here." << std::endl;
         }else{
