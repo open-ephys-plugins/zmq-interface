@@ -747,11 +747,18 @@ void ZmqInterface::checkForApplications()
     for (int i = 0; i < applications.size(); i++)
     {
         ZmqApplication *app = applications[i];
+        ZmqInterfaceEditor *zed =    dynamic_cast<ZmqInterfaceEditor *> (getEditor());
+
+        if( (timeNow - app->lastSeen) > 30 && !app->alive)
+        {
+            applications.remove(i);
+            zed->refreshListAsync();
+        }
+
         if ((timeNow - app->lastSeen) > 10 && app->alive)
         {
             app->alive = false;
             std::cout << "app " << app->name << " not alive" << std::endl;
-            ZmqInterfaceEditor *zed =    dynamic_cast<ZmqInterfaceEditor *> (getEditor());
             zed->refreshListAsync();
         }
     }

@@ -116,9 +116,19 @@ public:
         {
             g.setColour (Colours::darkgrey);
             g.setFont (14.0f);
-            g.drawText (noItemsMessage,
+        
+            if (!CoreServices::getAcquisitionStatus())
+            {
+                g.drawText ("Waiting for acqusition...",
+                            0, 0, getWidth(), getHeight() / 2,
+                            Justification::centred, true);
+            }
+            else
+            {
+                g.drawText (noItemsMessage,
                         0, 0, getWidth(), getHeight() / 2,
                         Justification::centred, true);
+            }
         }
     }
     
@@ -167,7 +177,6 @@ ZmqInterfaceEditor::ZmqInterfaceEditor(GenericProcessor *parentNode, bool useDef
     portButton->setButtonText("set ports");
     portButton->addListener(this);
 #endif
-    setEnabledState(false);
 }
 
 ZmqInterfaceEditor::~ZmqInterfaceEditor()
@@ -188,6 +197,16 @@ void ZmqInterfaceEditor::loadCustomParameters(XmlElement* xml)
 void ZmqInterfaceEditor::refreshListAsync()
 {
     listBox->triggerAsyncUpdate();
+}
+
+void ZmqInterfaceEditor::startAcquisition()
+{
+    listBox->refresh();
+}
+
+void ZmqInterfaceEditor::stopAcquisition()
+{
+    listBox->refresh();
 }
 
 OwnedArray<ZmqApplication> *ZmqInterfaceEditor::getApplicationList()
