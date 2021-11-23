@@ -47,7 +47,7 @@ struct ZmqApplication;
 class ZmqInterfaceEditor: public GenericEditor
 {
 public:
-    ZmqInterfaceEditor(GenericProcessor *parentNode, bool useDefaultParameters);
+    ZmqInterfaceEditor(GenericProcessor *parentNode);
     virtual ~ZmqInterfaceEditor();
     void saveCustomParameters(XmlElement *xml);
     void loadCustomParameters(XmlElement* xml);

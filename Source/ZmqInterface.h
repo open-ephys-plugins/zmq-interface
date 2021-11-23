@@ -62,18 +62,6 @@ public:
     /** The class destructor, used to deallocate memory */
     ~ZmqInterface();
     
-    /** Determines whether the processor is treated as a source. */
-    virtual bool isSource()
-    {
-        return false;
-    }
-    
-    /** Determines whether the processor is treated as a sink. */
-    virtual bool isSink()
-    {
-        return false;
-    }
-    
     /** Defines the functionality of the processor.
      
      The process method is called every time a new data buffer is available.
@@ -105,7 +93,6 @@ public:
     
     bool isReady();
     
-    void resetConnections();
     void run();
 
     OwnedArray<ZmqApplication> *getApplicationList();
@@ -130,8 +117,8 @@ private:
     int createDataSocket();
     int closeDataSocket();
 
-    void handleEvent(const EventChannel* eventInfo, const MidiMessage& event, int samplePosition);
-    void handleSpike(const SpikeChannel* spikeInfo, const MidiMessage& event, int samplePosition);
+    void handleEvent(const EventChannel* eventInfo, const EventPacket& packet, int samplePosition) override;
+    void handleSpike(const SpikeChannel* spikeInfo, const EventPacket& packet, int samplePosition) override;
     int sendData(float *data, int nChannels, int nSamples, int nRealSamples, 
                  int64 timestamp, int sampleRate);
     int sendEvent( uint8 type,
@@ -141,7 +128,7 @@ private:
                   uint8 numBytes,
                   const uint8* eventData,
                   int64 timestamp);
-    int sendSpikeEvent(const SpikeChannel* spikeInfo, const MidiMessage &event);
+    int sendSpikeEvent(const SpikeChannel* spikeInfo, const EventPacket& packet);
     
     // Currently only supports events related to keeping track of connected Applications
     int receiveEvents();

@@ -45,7 +45,7 @@ private ListBoxModel, public AsyncUpdater
 {
 public:
     ZmqInterfaceEditorListBox(const String noItemsText, ZmqInterfaceEditor *e):
-    ListBox(String::empty, nullptr), noItemsMessage(noItemsText)
+    ListBox(String(), nullptr), noItemsMessage(noItemsText)
     {
         editor = e;
         setModel(this);
@@ -152,7 +152,7 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ZmqInterfaceEditorListBox)
 };
 
-ZmqInterfaceEditor::ZmqInterfaceEditor(GenericProcessor *parentNode, bool useDefaultParameters): GenericEditor(parentNode, useDefaultParameters)
+ZmqInterfaceEditor::ZmqInterfaceEditor(GenericProcessor *parentNode): GenericEditor(parentNode)
 {
     ZmqProcessor = (ZmqInterface *)parentNode;
     listBox = new ZmqInterfaceEditorListBox(String("No App connected"), this);

@@ -76,7 +76,7 @@ ZmqInterface::ZmqInterface(const String& processorName)
     dataPort = 5556; //TODO make this editable
     listenPort = 5557;
     
-    setProcessorType(PROCESSOR_TYPE_FILTER);
+    setProcessorType(Plugin::Processor::FILTER);
 
     createContext();
     threadRunning = false;
@@ -396,16 +396,16 @@ int ZmqInterface::sendData(float *data, int nChannels, int nSamples, int nRealSa
 }
 
 // todo
-int ZmqInterface::sendSpikeEvent(const SpikeChannel* spikeInfo, const MidiMessage& event)
+int ZmqInterface::sendSpikeEvent(const SpikeChannel* spikeInfo, const EventPacket& packet)
 {
     messageNumber++;
     int size = 0;
 
-    const uint8_t* dataptr = event.getRawData();
-    int bufferSize = event.getRawDataSize();
+    const uint8_t* dataptr = packet.getRawData();
+    int bufferSize = packet.getRawDataSize();
     if (bufferSize)
     {
-        SpikeEventPtr spike = SpikeEvent::deserializeFromMessage(event, spikeInfo);
+        SpikePtr spike = Spike::deserialize(packet, spikeInfo);
 
         if (spike)
         {
@@ -423,7 +423,7 @@ int ZmqInterface::sendSpikeEvent(const SpikeChannel* spikeInfo, const MidiMessag
             c_obj->setProperty("n_samples", (int64)nSamples);
     
             // todo
-            c_obj->setProperty("electrode_id", getSpikeChannelIndex(spike));
+            c_obj->setProperty("electrode_id", spike->getChannelIndex());
 #if 0
             c_obj->setProperty("channel", spike.channel);
             c_obj->setProperty("source", spike.source);
@@ -593,8 +593,8 @@ AudioProcessorEditor* ZmqInterface::createEditor()
 {
     
     //        std::cout << "in PythonEditor::createEditor()" << std::endl;
-    editor = new ZmqInterfaceEditor(this, true);
-    return editor;
+    editor = std::make_unique<ZmqInterfaceEditor>(this);
+    return editor.get();
 }
 
 bool ZmqInterface::isReady()
@@ -604,7 +604,7 @@ bool ZmqInterface::isReady()
 
 void ZmqInterface::setParameter(int parameterIndex, float newValue)
 {
-    editor->updateParameterButtons(parameterIndex);
+    // editor->updateParameterButtons(parameterIndex);
     
     //Parameter& p =  parameters.getReference(parameterIndex);
     //p.setValue(newValue, 0);
@@ -612,28 +612,20 @@ void ZmqInterface::setParameter(int parameterIndex, float newValue)
     //threshold = newValue;
     
     //std::cout << float(p[0]) << std::endl;
-    editor->updateParameterButtons(parameterIndex);
+    // editor->updateParameterButtons(parameterIndex);
 }
 
-void ZmqInterface::resetConnections()
-{
-    nextAvailableChannel = 0;
-    
-    wasConnected = false;
 
-    return;
-}
-
-void ZmqInterface::handleEvent(const EventChannel* eventInfo, const MidiMessage& event, int samplePosition)
+void ZmqInterface::handleEvent(const EventChannel* eventInfo, const EventPacket& packet, int samplePosition)
 {
     //std::cout << "Event handling, type: " << Event::getEventType(event) << "\n" << std::flush;
 
-    if (Event::getEventType(event) == EventChannel::TTL)
+    if (Event::getEventType(packet) == EventChannel::TTL)
     {
-        TTLEventPtr ttl = TTLEvent::deserializeFromMessage(event, eventInfo);
+        TTLEventPtr ttl = TTLEvent::deserialize(packet, eventInfo);
 
-        const uint8* dataptr = event.getRawData();
-        int size = event.getRawDataSize();
+        const uint8* dataptr = packet.getRawData();
+        int size = packet.getRawDataSize();
         //std::cout << "event data size " << size << std::endl;
         uint8 numBytes;
         if (size > 6)
@@ -644,12 +636,12 @@ void ZmqInterface::handleEvent(const EventChannel* eventInfo, const MidiMessage&
 
         //int eventNodeId = *(dataptr+1);
         const int eventId = ttl->getState() ? 1 : 0;
-        const int eventChannel = ttl->getChannel();
+        const int eventChannel = ttl->getChannelIndex();
         //const int eventTime = samplePosition;
         //std::cout << "ZMQ TTL timestamp " << event.getTimeStamp() << " samplepos " << samplePosition << std::endl << std::flush;
         //std::cout << "TTL TS " << *(uint64_t*)(dataptr + 8) << " vs " << ttl->getTimestamp() << " vs " << event.getTimeStamp() << std::endl;
 
-        sendEvent(Event::getEventType(event),
+        sendEvent(Event::getEventType(packet),
             samplePosition,
             eventId,
             eventChannel,
@@ -659,10 +651,10 @@ void ZmqInterface::handleEvent(const EventChannel* eventInfo, const MidiMessage&
     }
 }
 
-void ZmqInterface::handleSpike(const SpikeChannel* spikeInfo, const MidiMessage& event, int samplePosition)
+void ZmqInterface::handleSpike(const SpikeChannel* spikeInfo, const EventPacket& packet, int samplePosition)
 {
     std::cout << "spike" << std::endl;
-    sendSpikeEvent(spikeInfo, event);
+    sendSpikeEvent(spikeInfo, packet);
 }
 
 int ZmqInterface::receiveEvents()
@@ -781,9 +773,9 @@ void ZmqInterface::process(AudioSampleBuffer& buffer)
 
     // Simplified sample rate detection (could check channel type or report
     // sampling rate of all channels separately in case they differ)
-    if (dataChannelArray.size() > 0) 
+    if (getTotalContinuousChannels() > 0) 
     {
-        sampleRate = dataChannelArray[0]->getSampleRate();
+        sampleRate = continuousChannels[0]->getSampleRate();
     }
     else 
     {   // this should never run - if no data channels, then no data...
