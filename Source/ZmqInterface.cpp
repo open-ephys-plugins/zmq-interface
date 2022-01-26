@@ -602,18 +602,18 @@ bool ZmqInterface::isReady()
     return true;
 }
 
-void ZmqInterface::setParameter(int parameterIndex, float newValue)
-{
-    // editor->updateParameterButtons(parameterIndex);
+// void ZmqInterface::setParameter(int parameterIndex, float newValue)
+// {
+//     // editor->updateParameterButtons(parameterIndex);
     
-    //Parameter& p =  parameters.getReference(parameterIndex);
-    //p.setValue(newValue, 0);
+//     //Parameter& p =  parameters.getReference(parameterIndex);
+//     //p.setValue(newValue, 0);
     
-    //threshold = newValue;
+//     //threshold = newValue;
     
-    //std::cout << float(p[0]) << std::endl;
-    // editor->updateParameterButtons(parameterIndex);
-}
+//     //std::cout << float(p[0]) << std::endl;
+//     // editor->updateParameterButtons(parameterIndex);
+// }
 
 
 void ZmqInterface::handleEvent(const EventChannel* eventInfo, const EventPacket& packet, int samplePosition)

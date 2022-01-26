@@ -155,15 +155,18 @@ private:
 ZmqInterfaceEditor::ZmqInterfaceEditor(GenericProcessor *parentNode): GenericEditor(parentNode)
 {
     ZmqProcessor = (ZmqInterface *)parentNode;
+
+    desiredWidth = 200;
+
     listBox = new ZmqInterfaceEditorListBox(String("No App connected"), this);
-    listBox->setBounds(2,45,130,85);
+    listBox->setBounds(10,45,170,80);
     addAndMakeVisible(listBox);
 
     listTitle = new Label();
     listTitle->setText("List of connected apps:", dontSendNotification);
     listTitle->setColour(Label::textColourId, Colours::black);
-    listTitle->setBounds(2,27,130,15);
-    listTitle->setFont(Font("FiraSans Bold", 14, Font::plain));
+    listTitle->setBounds(10,27,170,15);
+    listTitle->setFont(Font("Fira Code", "SemiBold", 14.0f));
     addAndMakeVisible(listTitle);
 #if 0
     dataPortEditor = new TextEditor("dataport");

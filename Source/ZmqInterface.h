@@ -57,7 +57,7 @@ class ZmqInterface    : public GenericProcessor, public Thread
 {
 public:
     /** The class constructor, used to initialize any members. */
-    ZmqInterface(const String &processorName = "Zmq Interface");
+    ZmqInterface(const String &processorName = "ZMQ Interface");
     
     /** The class destructor, used to deallocate memory */
     ~ZmqInterface();
@@ -75,12 +75,12 @@ public:
      size of the buffer).
      */
     //virtual void process(AudioSampleBuffer& buffer, MidiBuffer& events);
-    virtual void process(AudioSampleBuffer& continuousBuffer);
+    void process(AudioSampleBuffer& continuousBuffer);
     
-    /** Any variables used by the "process" function _must_ be modified only through
-     this method while data acquisition is active. If they are modified in any
-     other way, the application will crash.  */
-    void setParameter(int parameterIndex, float newValue);
+    // /** Any variables used by the "process" function _must_ be modified only through
+    //  this method while data acquisition is active. If they are modified in any
+    //  other way, the application will crash.  */
+    // void setParameter(int parameterIndex, float newValue);
     
     AudioProcessorEditor* createEditor();
     
