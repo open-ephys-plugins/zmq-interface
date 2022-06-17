@@ -119,7 +119,7 @@ public:
         
             if (!CoreServices::getAcquisitionStatus())
             {
-                g.drawText ("Waiting for acqusition...",
+                g.drawText ("Waiting for acqusition",
                             0, 0, getWidth(), getHeight() / 2,
                             Justification::centred, true);
             }
@@ -156,45 +156,32 @@ ZmqInterfaceEditor::ZmqInterfaceEditor(GenericProcessor *parentNode): GenericEdi
 {
     ZmqProcessor = (ZmqInterface *)parentNode;
 
-    desiredWidth = 200;
+    desiredWidth = 280;
 
-    listBox = new ZmqInterfaceEditorListBox(String("No App connected"), this);
-    listBox->setBounds(10,45,170,80);
-    addAndMakeVisible(listBox);
+    listBox = std::make_unique<ZmqInterfaceEditorListBox>(String("No App connected"), this);
+    listBox->setBounds(100,45,170,80);
+    addAndMakeVisible(listBox.get());
 
-    listTitle = new Label();
-    listTitle->setText("List of connected apps:", dontSendNotification);
+    listTitle = std::make_unique<Label>("ListBox Label", "List of connected apps:");
     listTitle->setColour(Label::textColourId, Colours::black);
-    listTitle->setBounds(10,27,170,15);
+    listTitle->setBounds(100,27,170,15);
     listTitle->setFont(Font("Fira Code", "SemiBold", 14.0f));
-    addAndMakeVisible(listTitle);
-#if 0
-    dataPortEditor = new TextEditor("dataport");
-    addAndMakeVisible(dataPortEditor);
-    dataPortEditor->setBounds(10, 110, 40, 16);
-    dataPortEditor->setText(String(ZmqProcessor->getDataPort()));
+    addAndMakeVisible(listTitle.get());
 
-	portButton = new TextButton("set_ports");
-    addAndMakeVisible(portButton);
-    portButton->setBounds(90, 110, 40, 16);
-    portButton->setButtonText("set ports");
-    portButton->addListener(this);
-#endif
+    addComboBoxParameterEditor("Stream", 10, 22);
+    
+    // addSelectedChannelsParameterEditor("Channels", 10, 67);
+    Parameter* maskChansParam = getProcessor()->getParameter("Channels");
+    maskchannelsEditor = std::make_unique<MaskChannelsParameterEditor>(maskChansParam);
+    maskchannelsEditor->setBounds(10, 67, maskchannelsEditor->getWidth(), maskchannelsEditor->getHeight());
+    addAndMakeVisible(maskchannelsEditor.get());
+    
+    addTextBoxParameterEditor("data_port", 10, 87);
 }
 
 ZmqInterfaceEditor::~ZmqInterfaceEditor()
 {
-    deleteAllChildren();
-}
 
-void ZmqInterfaceEditor::saveCustomParameters(XmlElement *xml)
-{
-    // todo: ports    
-}
-
-void ZmqInterfaceEditor::loadCustomParameters(XmlElement* xml)
-{
-    // todo: ports
 }
 
 void ZmqInterfaceEditor::refreshListAsync()
@@ -219,22 +206,7 @@ OwnedArray<ZmqApplication> *ZmqInterfaceEditor::getApplicationList()
     
 }
 
-#if 0
-void ZmqInterfaceEditor::buttonClicked(Button* button)
+void ZmqInterfaceEditor::updateMaskChannelsParameter(Parameter* param)
 {
-    if (button == portButton)
-    {
-        String dport = dataPortEditor->getText();
-        int dportVal = dport.getIntValue();
-        if ( (dportVal == 0) && !dport.containsOnly("0")) {
-            // wrong integer input
-            CoreServices::sendStatusMessage("Invalid data port value");
-            dataPortEditor->setText(String(ZmqProcessor->getDataPort()));
-        } else {
-            ZmqProcessor->setPorts(dportVal, dportVal + 1);
-            CoreServices::sendStatusMessage("ZMQ ports updated");
-        }
-    }
+    maskchannelsEditor->setParameter(param);
 }
-#endif
-

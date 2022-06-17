@@ -71,12 +71,18 @@ ZmqInterface::ZmqInterface(const String& processorName)
     pipeInSocket = 0;
     pipeOutSocket = 0;
     
-    flag = 0;
     messageNumber = 0;
-    dataPort = 5556; //TODO make this editable
+    dataPort = 5556;
     listenPort = 5557;
+    selectedStream = 0;
     
     setProcessorType(Plugin::Processor::FILTER);
+
+    addMaskChannelsParameter(Parameter::STREAM_SCOPE, "Channels", "The input channel data to send");
+
+    addCategoricalParameter(Parameter::GLOBAL_SCOPE, "Stream", "The stream to send data from", StringArray("None"), 0, true);
+
+    addIntParameter(Parameter::GLOBAL_SCOPE, "data_port", "Port number to send data", dataPort, 1000, 65535, true);
 
     createContext();
     threadRunning = false;
@@ -133,12 +139,12 @@ int ZmqInterface::createDataSocket()
             return -1;
         String urlstring;
         urlstring = String("tcp://*:") + String(dataPort);
-        std::cout << urlstring << std::endl;
+       LOGD("[ZMQ] ", urlstring);
         int rc = zmq_bind(socket, urlstring.toRawUTF8());
         if (rc)
         {
-            std::cout << "couldn't open data socket" << std::endl;
-            std::cout << zmq_strerror(zmq_errno()) << std::endl;
+            LOGE("Couldn't open data socket");
+            LOGE(zmq_strerror(zmq_errno()));
             jassert(false);
         }
     }
@@ -149,7 +155,7 @@ int ZmqInterface::closeDataSocket()
 {
     if (socket)
     {
-        std::cout << "close data socket" << std::endl;
+        LOGD("Close data socket");
         int rc = zmq_close(socket);
         jassert(rc==0);
         socket = 0;
@@ -167,7 +173,7 @@ int ZmqInterface::closeListenSocket()
     int rc = 0;
     if (listenSocket)
     {
-        std::cout << "close listen socket" << std::endl;
+        LOGD("Close listen socket");
         rc = zmq_close(listenSocket);
         listenSocket = 0;
     }
@@ -190,7 +196,6 @@ void ZmqInterface::openPipeOutSocket()
 void ZmqInterface::run()
 {
     //OutputDebugStringW(L"ZMQ plugin starting.\n");
-    std::cout << "ZMQ plugin starting." << std::endl;
     listenSocket = zmq_socket(context, ZMQ_REP);
     String urlstring;
     urlstring = String("tcp://*:") + String(listenPort);
@@ -223,14 +228,11 @@ void ZmqInterface::run()
             
             if (size < 0)
             {
-                std::cout << "failed in receiving listen socket" << std::endl;
-                std::cout << zmq_strerror(zmq_errno()) << std::endl;
+                LOGE("Failed in receiving listen socket");
+                LOGE(zmq_strerror(zmq_errno()));
                 jassert(false);
             }
             var v;
-#ifdef ZMQ_DEBUG
-            std::cout << "in listening thread: " << String(buffer) << std::endl;
-#endif
             Result rs = JSON::parse(String(buffer), v);
             bool ok = rs.wasOk();
 
@@ -251,9 +253,6 @@ void ZmqInterface::run()
                 ed.numBytes = 0; // TODO  allow for event data
                 ed.sampleNum = (int)v["event"]["sample_num"];
                 ed.type = (int)v["event"]["type"];
-//                std::cout << "chan " << (int)ed.eventChannel << " id " << (int)ed.eventId << " sample n "
-//                    << (int)ed.sampleNum << " type " << (int)ed.type <<
-//                    std::endl;
             }
             else
             {
@@ -338,7 +337,7 @@ void ZmqInterface::run()
  */
 
 
-int ZmqInterface::sendData(float *data, int nChannels, int nSamples, int nRealSamples, 
+int ZmqInterface::sendData(float *data, int channelNum, int nSamples, int nRealSamples, 
                            int64 timestamp, int sampleRate)
 {
     
@@ -353,14 +352,15 @@ int ZmqInterface::sendData(float *data, int nChannels, int nSamples, int nRealSa
     
     DynamicObject::Ptr c_obj = new DynamicObject();
     
-    c_obj->setProperty("n_channels", nChannels);
+    c_obj->setProperty("stream_id", selectedStream);
+    c_obj->setProperty("channel_num", channelNum);
     c_obj->setProperty("n_samples", nSamples);
     c_obj->setProperty("n_real_samples", nRealSamples);
     c_obj->setProperty("timestamp", timestamp);
     c_obj->setProperty("sample_rate", sampleRate);
 
     obj->setProperty("content", var(c_obj));
-    obj->setProperty("data_size", (int)(nChannels * nSamples * sizeof(float)));
+    obj->setProperty("data_size", (int)(nSamples * sizeof(float)));
     
     var json(obj);
     
@@ -385,8 +385,8 @@ int ZmqInterface::sendData(float *data, int nChannels, int nSamples, int nRealSa
     zmq_msg_close(&messageHeader);
     
     zmq_msg_t message;
-    zmq_msg_init_size(&message, sizeof(float)*nSamples*nChannels);
-    memcpy(zmq_msg_data(&message), data, sizeof(float)*nSamples*nChannels);
+    zmq_msg_init_size(&message, sizeof(float)*nSamples);
+    memcpy(zmq_msg_data(&message), data, sizeof(float)*nSamples);
     int size_m = zmq_msg_send(&message, socket, 0);
     jassert(size_m);
     size += size_m;
@@ -396,53 +396,39 @@ int ZmqInterface::sendData(float *data, int nChannels, int nSamples, int nRealSa
 }
 
 // todo
-int ZmqInterface::sendSpikeEvent(const SpikeChannel* spikeInfo, const EventPacket& packet)
+int ZmqInterface::sendSpikeEvent(const SpikePtr spike)
 {
     messageNumber++;
     int size = 0;
 
-    const uint8_t* dataptr = packet.getRawData();
-    int bufferSize = packet.getRawDataSize();
+    int bufferSize = spike->getChannelInfo()->getDataSize();
     if (bufferSize)
     {
-        SpikePtr spike = Spike::deserialize(packet, spikeInfo);
-
         if (spike)
         {
             DynamicObject::Ptr obj = new DynamicObject();
             obj->setProperty("message_no", messageNumber);
             obj->setProperty("type", "spike");
+
             DynamicObject::Ptr c_obj = new DynamicObject();
-            c_obj->setProperty("timestamp", (int64)spike->getTimestamp());
-            //c_obj->setProperty("timestamp_software",
-            //                 (int64)spike.timestamp_software);
             const SpikeChannel* channel = spike->getChannelInfo();
+
+            c_obj->setProperty("type", (uint8)channel->getChannelType());
+            c_obj->setProperty("sample_num", spike->getSampleNumber());
             uint32_t nChannels = channel->getNumChannels();
             uint32_t nSamples = channel->getTotalSamples();
-            c_obj->setProperty("n_channels", (int64)nChannels);
-            c_obj->setProperty("n_samples", (int64)nSamples);
-    
-            // todo
+            c_obj->setProperty("n_channels", (int64)channel->getNumChannels());
+            c_obj->setProperty("n_samples", (int64)channel->getTotalSamples());
+            c_obj->setProperty("pre_peak_samples", (int64)channel->getPrePeakSamples());
+            c_obj->setProperty("post_peak_samples", (int64)channel->getPostPeakSamples());
             c_obj->setProperty("electrode_id", spike->getChannelIndex());
-#if 0
-            c_obj->setProperty("channel", spike.channel);
-            c_obj->setProperty("source", spike.source);
-            var c_var(spike.color[0]);
-            c_var.append(spike.color[1]);
-            c_var.append(spike.color[2]);
-            c_obj->setProperty("color", c_var);
-            var p_var(spike.pcProj[0]);
-            p_var.append(spike.pcProj[1]);
-            c_obj->setProperty("pc_proj", p_var);
-            var g_var(spike.gain[0]);
-            for (int i = 1; i < spike.nChannels; i++)
-                g_var.append(spike.gain[i]);
-            c_obj->setProperty("gain", g_var);
-            var t_var = var(spike.threshold[0]);
-            for (int i = 1; i < spike.nChannels; i++)
-                t_var.append(spike.threshold[i]);
+            c_obj->setProperty("spike_stream", spike->getStreamId());
+
+            var t_var;
+            for (int i = 0; i < nChannels; i++)
+                t_var.append(spike->getThreshold(i));
             c_obj->setProperty("threshold", t_var);
-#endif
+
             obj->setProperty("spike", var(c_obj));
             var json (obj);
             String s = JSON::toString(json);
@@ -464,9 +450,9 @@ int ZmqInterface::sendSpikeEvent(const SpikeChannel* spikeInfo, const EventPacke
             jassert(size != -1);
             zmq_msg_close(&messageHeader);
             zmq_msg_t message;
-            zmq_msg_init_size(&message, nChannels * nSamples);
+            zmq_msg_init_size(&message, channel->getDataSize());
             // getdatapointer???
-            memcpy(zmq_msg_data(&message), spike->getDataPointer(), nChannels * nSamples);
+            memcpy(zmq_msg_data(&message), spike->getDataPointer(), channel->getDataSize());
             size = zmq_msg_send(&message, socket, 0);
             
         }
@@ -475,12 +461,11 @@ int ZmqInterface::sendSpikeEvent(const SpikeChannel* spikeInfo, const EventPacke
 }
 
 int ZmqInterface::sendEvent( uint8 type,
-                             int sampleNum,
-                             uint8 eventId,
-                             uint8 eventChannel,
-                             uint8 numBytes,
-                             const uint8* eventData,
-                             int64 timestamp)
+                             int64 sampleNum,
+                             uint16 eventStream,
+                             uint16 eventChannel,
+                             size_t numBytes,
+                             const uint8* eventData)
 {
     int size;
     
@@ -494,12 +479,11 @@ int ZmqInterface::sendEvent( uint8 type,
     DynamicObject::Ptr c_obj = new DynamicObject();
     c_obj->setProperty("type", type);
     c_obj->setProperty("sample_num", sampleNum);
-    c_obj->setProperty("event_id", eventId);
+    c_obj->setProperty("event_stream", eventStream);
     c_obj->setProperty("event_channel", eventChannel);
-    c_obj->setProperty("timestamp", timestamp);
 
     obj->setProperty("content", var(c_obj));
-    obj->setProperty("data_size", numBytes);
+    obj->setProperty("data_size", (int)numBytes);
     
     var json (obj);
     String s = JSON::toString(json);
@@ -602,59 +586,28 @@ bool ZmqInterface::isReady()
     return true;
 }
 
-// void ZmqInterface::setParameter(int parameterIndex, float newValue)
-// {
-//     // editor->updateParameterButtons(parameterIndex);
-    
-//     //Parameter& p =  parameters.getReference(parameterIndex);
-//     //p.setValue(newValue, 0);
-    
-//     //threshold = newValue;
-    
-//     //std::cout << float(p[0]) << std::endl;
-//     // editor->updateParameterButtons(parameterIndex);
-// }
 
-
-void ZmqInterface::handleEvent(const EventChannel* eventInfo, const EventPacket& packet, int samplePosition)
+void ZmqInterface::handleTTLEvent(TTLEventPtr event)
 {
-    //std::cout << "Event handling, type: " << Event::getEventType(event) << "\n" << std::flush;
 
-    if (Event::getEventType(packet) == EventChannel::TTL)
+    if (event->getEventType() == EventChannel::TTL && event->getStreamId() == selectedStream)
     {
-        TTLEventPtr ttl = TTLEvent::deserialize(packet, eventInfo);
+        const uint8* dataptr = reinterpret_cast<const uint8*>(event->getRawDataPointer());
+        uint8 numBytes = event->getChannelInfo()->getDataSize();
 
-        const uint8* dataptr = packet.getRawData();
-        int size = packet.getRawDataSize();
-        //std::cout << "event data size " << size << std::endl;
-        uint8 numBytes;
-        if (size > 6)
-            numBytes = size - 6;
-        else
-            numBytes = 0;
-
-
-        //int eventNodeId = *(dataptr+1);
-        const int eventId = ttl->getState() ? 1 : 0;
-        const int eventChannel = ttl->getChannelIndex();
-        //const int eventTime = samplePosition;
-        //std::cout << "ZMQ TTL timestamp " << event.getTimeStamp() << " samplepos " << samplePosition << std::endl << std::flush;
-        //std::cout << "TTL TS " << *(uint64_t*)(dataptr + 8) << " vs " << ttl->getTimestamp() << " vs " << event.getTimeStamp() << std::endl;
-
-        sendEvent(Event::getEventType(packet),
-            samplePosition,
-            eventId,
-            eventChannel,
+        sendEvent(event->getEventType(),
+            event->getSampleNumber(),
+            event->getStreamId(),
+            event->getChannelIndex(),
             numBytes,
-            dataptr + 6,
-            ttl->getTimestamp()); // there should be a better way... getTimeStamp()??
+            dataptr);
     }
 }
 
-void ZmqInterface::handleSpike(const SpikeChannel* spikeInfo, const EventPacket& packet, int samplePosition)
+void ZmqInterface::handleSpike(SpikePtr spike)
 {
-    std::cout << "spike" << std::endl;
-    sendSpikeEvent(spikeInfo, packet);
+    if(spike->getStreamId() == selectedStream)
+        sendSpikeEvent(spike);
 }
 
 int ZmqInterface::receiveEvents()
@@ -672,13 +625,9 @@ int ZmqInterface::receiveEvents()
             }
             else
             {
-                std::cout << "pipe out error: " << zmq_strerror(zmq_errno()) << std::endl;
+                LOGE("Pipe out error: ", zmq_strerror(zmq_errno()));
             }
         }
-//        std::cout << "adding events" << std::endl;
-//        std::cout << "chan " << (int)ed.eventChannel << " id " << (int)ed.eventId << " sample n "
-//        << (int)ed.sampleNum << " type " << (int)ed.type <<
-//        std::endl;
         
         int appNo = -1;
         for (int i = 0; i < applications.size(); i++)
@@ -707,8 +656,7 @@ int ZmqInterface::receiveEvents()
             app->lastSeen = ed.eventTime;
             app->alive = true;
             applications.add(app);
-            std::cout << "adding new application " << app->name << " " << app->Uuid << std::endl;
-            std::cout << " now there are " << applications.size() << " apps" << std::endl;
+            LOGC("Adding new application ", app->name, " ", app->Uuid);
             ZmqInterfaceEditor *zed =    dynamic_cast<ZmqInterfaceEditor *> (getEditor());
             zed->refreshListAsync();
 //            MessageManagerLock mmlock;
@@ -717,7 +665,7 @@ int ZmqInterface::receiveEvents()
         }
 
         if (ed.isEvent) {
-            std::cout << "ZMQ event received\n";
+            LOGD("ZMQ event received");
         }
 #if 0
         if (ed.isEvent) {
@@ -750,7 +698,7 @@ void ZmqInterface::checkForApplications()
         if ((timeNow - app->lastSeen) > 10 && app->alive)
         {
             app->alive = false;
-            std::cout << "app " << app->name << " not alive" << std::endl;
+            LOGC("App ", app->name, " not alive");
             zed->refreshListAsync();
         }
     }
@@ -766,24 +714,36 @@ void ZmqInterface::process(AudioSampleBuffer& buffer)
 
     checkForEvents(true); // see if we got any TTL events
 
-    // current timestamp is at the end of the buffer; we want to send the timestamp of the first sample instead
-    uint64_t firstTs = getTimestamp(0) - getNumSamples(0);
-
-    float sampleRate;
-
-    // Simplified sample rate detection (could check channel type or report
-    // sampling rate of all channels separately in case they differ)
-    if (getTotalContinuousChannels() > 0) 
+    for (auto stream : dataStreams)
     {
-        sampleRate = continuousChannels[0]->getSampleRate();
-    }
-    else 
-    {   // this should never run - if no data channels, then no data...
-        sampleRate = CoreServices::getGlobalSampleRate();
-    }
+        
+        if ((*stream)["enable_stream"]
+            && stream->getStreamId() == selectedStream)
+        {
+            // Send the sample number of the first sample in the buffer block
+            juce::int64 sampleNum = getFirstSampleNumberForBlock(stream->getStreamId()) ;
 
-    sendData(*(buffer.getArrayOfWritePointers()), buffer.getNumChannels(), 
-        buffer.getNumSamples(), getNumSamples(0), firstTs, (int)sampleRate);
+            float sampleRate;
+
+            // Simplified sample rate detection (could check channel type or report
+            // sampling rate of all channels separately in case they differ)
+            if (stream->getChannelCount() > 0) 
+            {
+                sampleRate = stream->getSampleRate();
+            }
+            else 
+            {   // this should never run - if no data channels, then no data...
+                sampleRate = CoreServices::getGlobalSampleRate();
+            }
+            
+            for(auto chan : selectedChannels)
+            {
+                int globalChanIndex = stream->getContinuousChannels().getUnchecked(chan)->getGlobalIndex();
+                sendData(buffer.getWritePointer(globalChanIndex), chan, 
+                        buffer.getNumSamples(), getNumSamplesInBlock(selectedStream), sampleNum, (int)sampleRate);
+            }
+        }
+    }
 
     receiveEvents();
     checkForApplications();
@@ -791,7 +751,54 @@ void ZmqInterface::process(AudioSampleBuffer& buffer)
 
 void ZmqInterface::updateSettings()
 {
-    
+    streamNamesMap.clear();
+    StringArray streamNames;
+
+    for(auto stream : getDataStreams())
+    {
+        streamNamesMap.emplace(stream->getStreamId(), stream->getName());
+        String streamString = stream->getName() + "[" + String(stream->getSourceNodeId()) + "]";
+        streamNames.add(streamString);
+    }
+
+    static_cast<CategoricalParameter*>(getParameter("Stream"))->setCategories(streamNames);
+    getEditor()->updateView();
+
+    parameterValueChanged(getParameter("Stream"));
 }
 
 
+void ZmqInterface::parameterValueChanged(Parameter* param)
+{
+    if (param->getName().equalsIgnoreCase("Channels"))
+    {   
+        if(param->getStreamId() == selectedStream)
+            selectedChannels = static_cast<MaskChannelsParameter*>(param)->getArrayValue();
+    }
+    else if (param->getName().equalsIgnoreCase("Stream"))
+    {   
+        String streamName = static_cast<CategoricalParameter*>(param)->getSelectedString().upToFirstOccurrenceOf("[", false, false);
+
+        // Update the selected stream's ID and the mask channels parameter
+        for (const auto& pair : streamNamesMap)
+        {
+            if(pair.second.equalsIgnoreCase(streamName))
+            {
+                selectedStream = pair.first;
+                
+                Parameter* p =  getDataStream(selectedStream)->getParameter("Channels");
+                auto editor = static_cast<ZmqInterfaceEditor*>(getEditor());
+                editor->updateMaskChannelsParameter(p);
+                parameterValueChanged(p);
+
+                break;
+            }
+        }
+    }
+    else if (param->getName().equalsIgnoreCase("data_port"))
+    {
+        // close previous data socket and assign new data port
+        closeDataSocket();
+        dataPort = static_cast<IntParameter*>(param)->getIntValue();
+    }
+}

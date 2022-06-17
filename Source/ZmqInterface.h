@@ -89,7 +89,10 @@ public:
         return true;
     }
     
-    void updateSettings();
+    void updateSettings() override;
+
+    /** Called when a parameter is updated*/
+    void parameterValueChanged(Parameter* param) override;
     
     bool isReady();
     
@@ -108,6 +111,8 @@ public:
     uint32_t getListenPort () const { return listenPort; }
 #endif
 
+    uint16 selectedStream;
+
 private:
     int createContext();
     void openListenSocket();
@@ -117,18 +122,17 @@ private:
     int createDataSocket();
     int closeDataSocket();
 
-    void handleEvent(const EventChannel* eventInfo, const EventPacket& packet, int samplePosition) override;
-    void handleSpike(const SpikeChannel* spikeInfo, const EventPacket& packet, int samplePosition) override;
-    int sendData(float *data, int nChannels, int nSamples, int nRealSamples, 
+    void handleTTLEvent(TTLEventPtr event) override;
+    void handleSpike (SpikePtr spike) override;
+    int sendData(float *data, int channelNum, int nSamples, int nRealSamples, 
                  int64 timestamp, int sampleRate);
     int sendEvent( uint8 type,
-                  int sampleNum,
-                  uint8 eventId,
-                  uint8 eventChannel,
-                  uint8 numBytes,
-                  const uint8* eventData,
-                  int64 timestamp);
-    int sendSpikeEvent(const SpikeChannel* spikeInfo, const EventPacket& packet);
+                  int64 sampleNum,
+                  uint16 eventStream,
+                  uint16 eventChannel,
+                  size_t numBytes,
+                  const uint8* eventData);
+    int sendSpikeEvent(const SpikePtr spike);
     
     // Currently only supports events related to keeping track of connected Applications
     int receiveEvents();
@@ -148,10 +152,13 @@ private:
     
     OwnedArray<ZmqApplication> applications;
     
-    int flag;
     int messageNumber;
     int dataPort; //TODO make this editable
     int listenPort;
+
+    Array<int> selectedChannels;
+    std::map<uint16, String> streamNamesMap;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ZmqInterface);
     
 };

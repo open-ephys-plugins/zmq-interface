@@ -49,28 +49,24 @@ class ZmqInterfaceEditor: public GenericEditor
 public:
     ZmqInterfaceEditor(GenericProcessor *parentNode);
     virtual ~ZmqInterfaceEditor();
-    void saveCustomParameters(XmlElement *xml);
-    void loadCustomParameters(XmlElement* xml);
+
     void refreshListAsync();
     void startAcquisition() override;
     void stopAcquisition() override;
-#if 0
-    void setPorts(uint32_t dataPort, uint32_t listenPort, void callback());
-    void buttonClicked(Button* button) override;
-#endif
+
+    void updateMaskChannelsParameter(Parameter* param);
+
 private:
-    //TODO UI components
     class ZmqInterfaceEditorListBox;
-#if 0
-    TextEditor *dataPortEditor, *listenPortEditor;
-    TextButton *portButton;
-#endif
+
     OwnedArray<ZmqApplication> *getApplicationList();
     ZmqInterface *ZmqProcessor;
-    ZmqInterfaceEditorListBox *listBox;
-    Label *listTitle;
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ZmqInterfaceEditor)
+    std::unique_ptr<ZmqInterfaceEditorListBox> listBox;
+    std::unique_ptr<Label> listTitle;
 
+    std::unique_ptr<MaskChannelsParameterEditor> maskchannelsEditor;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ZmqInterfaceEditor)
     
 };
 
