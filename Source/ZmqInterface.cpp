@@ -25,16 +25,6 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  
  */
-/* 
-  ==============================================================================
-
-    ZmqInterface.cpp
-    Created: 19 Sep 2015 9:47:12pm
-    Author:  Francesco Battaglia
-    Updated by: Andras Szell
-
-  ==============================================================================
-*/
 
 #include <zmq.h>
 #include <string.h>
@@ -61,7 +51,7 @@ struct EventData {
 
 
 ZmqInterface::ZmqInterface(const String& processorName)
-    : GenericProcessor(processorName), Thread("Zmq thread")
+    : GenericProcessor(processorName), Thread("ZMQ thread")
 {
     context = 0;
     socket = 0;
@@ -75,9 +65,10 @@ ZmqInterface::ZmqInterface(const String& processorName)
     dataPort = 5556;
     listenPort = 5557;
     selectedStream = 0;
+    selectedStreamSourceNodeId = 0;
+    selectedStreamName = "";
+    selectedStreamSampleRate = 0.0f;
     
-    setProcessorType(Plugin::Processor::FILTER);
-
     addMaskChannelsParameter(Parameter::STREAM_SCOPE, "Channels", "The input channel data to send");
 
     addCategoricalParameter(Parameter::GLOBAL_SCOPE, "Stream", "The stream to send data from", StringArray("None"), 0, true);
@@ -115,6 +106,13 @@ ZmqInterface::~ZmqInterface()
         zmq_ctx_destroy(context);
         context = 0;
     }
+}
+
+
+AudioProcessorEditor* ZmqInterface::createEditor()
+{
+    editor = std::make_unique<ZmqInterfaceEditor>(this);
+    return editor.get();
 }
 
 OwnedArray<ZmqApplication> *ZmqInterface::getApplicationList()
@@ -303,60 +301,71 @@ void ZmqInterface::run()
     return;
 }
 
-/* format for passing data
- JSON
+/* format of output packets (JSON)
  { 
-  "message_no": number,
-  "type": "data"|"event"|"parameter",
+  "message_num": number,
+  "type": "data"|"event"|"spike"|"parameter",
   "content":
   (for data)
   {
-    "n_channels": nChannels,
-    "n_samples": nSamples,
-    "n_real_samples": nRealSamples,
-    "sample_rate": (integer) sampling rate of first channel,
-    "timestamp": sample id (number)
+    "stream" : stream name (string)
+    "channel_num" : local channel index
+    "num_samples": num of samples in this buffer
+    "sample_num": index of first sample
+    "sample_rate": sampling rate of this channel
   }
   (for event)
   {
-    "type": number,
-    "sample_num": sampleNum (number),
-    "event_id": id (number),
-    "event_channel": channel (number),
-    "timestamp": sample id (number)
+    "stream" : stream name (string)
+    "source_node" : processor ID that generated the event
+    "type": specifies TTL vs. message,
+    "sample_num": index of the event
+  }
+  (for spike)
+  {
+    "stream" : stream name (string)
+    "source_node" : processor ID that generated the spike
+    "electrode" : name of the spike channel
+    "sample_num" : index of the peak sample
+    "num_channels" : total number of channels in this spike
+    "num_samples" : total number of samples in this spike
+    "sorted_id" : sorted ID (default = 0)
+    "threshold" : threshold values across all channels
   }
   (for parameter) // todo
   {
     "param_name1": param_value1,
     "param_name2": param_value2,
   }
-  "data_size": size (if size > 0 it's the size of binary data coming in in the next frame (multi-part message)
+  "data_size": size (if size > 0 it's the size of binary data coming in 
+               the next frame (multi-part message))
  }
  
  and then a possible data packet
  */
 
 
-int ZmqInterface::sendData(float *data, int channelNum, int nSamples, int nRealSamples, 
-                           int64 timestamp, int sampleRate)
+int ZmqInterface::sendData(float *data, 
+    int channelNum, 
+    int nSamples, 
+    int64 sampleNumber, 
+    float sampleRate)
 {
     
     messageNumber++;
-    
-
+   
     DynamicObject::Ptr obj = new DynamicObject();
     
     int mn = messageNumber;
-    obj->setProperty("message_no", mn);
+    obj->setProperty("message_num", mn);
     obj->setProperty("type", "data");
     
     DynamicObject::Ptr c_obj = new DynamicObject();
     
-    c_obj->setProperty("stream_id", selectedStream);
+    c_obj->setProperty("stream", selectedStreamName);
     c_obj->setProperty("channel_num", channelNum);
-    c_obj->setProperty("n_samples", nSamples);
-    c_obj->setProperty("n_real_samples", nRealSamples);
-    c_obj->setProperty("timestamp", timestamp);
+    c_obj->setProperty("num_samples", nSamples);
+    c_obj->setProperty("sample_num", sampleNumber);
     c_obj->setProperty("sample_rate", sampleRate);
 
     obj->setProperty("content", var(c_obj));
@@ -367,7 +376,6 @@ int ZmqInterface::sendData(float *data, int channelNum, int nSamples, int nRealS
     String s = JSON::toString(json);
     void *headerData = (void *)s.toRawUTF8();
     
-
     size_t headerSize = s.length();
     
     zmq_msg_t messageEnvelope;
@@ -395,7 +403,7 @@ int ZmqInterface::sendData(float *data, int channelNum, int nSamples, int nRealS
     return size;
 }
 
-// todo
+
 int ZmqInterface::sendSpikeEvent(const SpikePtr spike)
 {
     messageNumber++;
@@ -407,22 +415,20 @@ int ZmqInterface::sendSpikeEvent(const SpikePtr spike)
         if (spike)
         {
             DynamicObject::Ptr obj = new DynamicObject();
-            obj->setProperty("message_no", messageNumber);
+            obj->setProperty("message_num", messageNumber);
             obj->setProperty("type", "spike");
 
             DynamicObject::Ptr c_obj = new DynamicObject();
             const SpikeChannel* channel = spike->getChannelInfo();
+            int64 nChannels = channel->getNumChannels();
 
-            c_obj->setProperty("type", (uint8)channel->getChannelType());
+            c_obj->setProperty("stream", selectedStreamName);
+            c_obj->setProperty("source_node", spike->getProcessorId());
+            c_obj->setProperty("electrode", channel->getName());
             c_obj->setProperty("sample_num", spike->getSampleNumber());
-            uint32_t nChannels = channel->getNumChannels();
-            uint32_t nSamples = channel->getTotalSamples();
-            c_obj->setProperty("n_channels", (int64)channel->getNumChannels());
-            c_obj->setProperty("n_samples", (int64)channel->getTotalSamples());
-            c_obj->setProperty("pre_peak_samples", (int64)channel->getPrePeakSamples());
-            c_obj->setProperty("post_peak_samples", (int64)channel->getPostPeakSamples());
-            c_obj->setProperty("electrode_id", spike->getChannelIndex());
-            c_obj->setProperty("spike_stream", spike->getStreamId());
+            c_obj->setProperty("num_channels", nChannels);
+            c_obj->setProperty("num_samples", (int64)channel->getTotalSamples());
+            c_obj->setProperty("sorted_id", spike->getSortedId());
 
             var t_var;
             for (int i = 0; i < nChannels; i++)
@@ -434,8 +440,7 @@ int ZmqInterface::sendSpikeEvent(const SpikePtr spike)
             String s = JSON::toString(json);
             void *headerData = (void *)s.toRawUTF8();
             size_t headerSize = s.length();
-            
-            
+           
             zmq_msg_t messageEnvelope;
             zmq_msg_init_size(&messageEnvelope, strlen("EVENT")+1);
             memcpy(zmq_msg_data(&messageEnvelope), "EVENT", strlen("EVENT")+1);
@@ -462,8 +467,7 @@ int ZmqInterface::sendSpikeEvent(const SpikePtr spike)
 
 int ZmqInterface::sendEvent( uint8 type,
                              int64 sampleNum,
-                             uint16 eventStream,
-                             uint16 eventChannel,
+                             int sourceNodeId,
                              size_t numBytes,
                              const uint8* eventData)
 {
@@ -477,11 +481,11 @@ int ZmqInterface::sendEvent( uint8 type,
     obj->setProperty("type", "event");
     
     DynamicObject::Ptr c_obj = new DynamicObject();
+    c_obj->setProperty("stream", selectedStreamName);
+    c_obj->setProperty("source_node", sourceNodeId);
     c_obj->setProperty("type", type);
     c_obj->setProperty("sample_num", sampleNum);
-    c_obj->setProperty("event_stream", eventStream);
-    c_obj->setProperty("event_channel", eventChannel);
-
+    
     obj->setProperty("content", var(c_obj));
     obj->setProperty("data_size", (int)numBytes);
     
@@ -490,7 +494,7 @@ int ZmqInterface::sendEvent( uint8 type,
     void *headerData = (void *)s.toRawUTF8();
     size_t headerSize = s.length();
     
-    
+  
     zmq_msg_t messageEnvelope;
     zmq_msg_init_size(&messageEnvelope, strlen("EVENT")+1);
     memcpy(zmq_msg_data(&messageEnvelope), "EVENT", strlen("EVENT")+1);
@@ -573,19 +577,6 @@ template<typename T> int ZmqInterface::sendParam(String name, T value)
 }
 
 
-AudioProcessorEditor* ZmqInterface::createEditor()
-{
-    
-    //        std::cout << "in PythonEditor::createEditor()" << std::endl;
-    editor = std::make_unique<ZmqInterfaceEditor>(this);
-    return editor.get();
-}
-
-bool ZmqInterface::isReady()
-{
-    return true;
-}
-
 
 void ZmqInterface::handleTTLEvent(TTLEventPtr event)
 {
@@ -597,8 +588,7 @@ void ZmqInterface::handleTTLEvent(TTLEventPtr event)
 
         sendEvent(event->getEventType(),
             event->getSampleNumber(),
-            event->getStreamId(),
-            event->getChannelIndex(),
+            event->getProcessorId(),
             numBytes,
             dataptr);
     }
@@ -704,7 +694,7 @@ void ZmqInterface::checkForApplications()
     }
 }
 
-void ZmqInterface::process(AudioSampleBuffer& buffer)
+void ZmqInterface::process(AudioBuffer<float>& buffer)
 {
     if (!socket)
         createDataSocket();
@@ -712,7 +702,7 @@ void ZmqInterface::process(AudioSampleBuffer& buffer)
     if (!pipeOutSocket)
         openPipeOutSocket();
 
-    checkForEvents(true); // see if we got any TTL events
+    checkForEvents(true); // see if we got any TTL events or spikes
 
     for (auto stream : dataStreams)
     {
@@ -721,26 +711,14 @@ void ZmqInterface::process(AudioSampleBuffer& buffer)
             && stream->getStreamId() == selectedStream)
         {
             // Send the sample number of the first sample in the buffer block
-            juce::int64 sampleNum = getFirstSampleNumberForBlock(stream->getStreamId()) ;
+            int64 sampleNum = getFirstSampleNumberForBlock(stream->getStreamId()) ;
+            int numSamples = getNumSamplesInBlock(selectedStream);
 
-            float sampleRate;
-
-            // Simplified sample rate detection (could check channel type or report
-            // sampling rate of all channels separately in case they differ)
-            if (stream->getChannelCount() > 0) 
-            {
-                sampleRate = stream->getSampleRate();
-            }
-            else 
-            {   // this should never run - if no data channels, then no data...
-                sampleRate = CoreServices::getGlobalSampleRate();
-            }
-            
             for(auto chan : selectedChannels)
             {
                 int globalChanIndex = stream->getContinuousChannels().getUnchecked(chan)->getGlobalIndex();
                 sendData(buffer.getWritePointer(globalChanIndex), chan, 
-                        buffer.getNumSamples(), getNumSamplesInBlock(selectedStream), sampleNum, (int)sampleRate);
+                    numSamples, sampleNum, selectedStreamSampleRate);
             }
         }
     }
@@ -785,6 +763,9 @@ void ZmqInterface::parameterValueChanged(Parameter* param)
             if(pair.second.equalsIgnoreCase(streamName))
             {
                 selectedStream = pair.first;
+                selectedStreamName = getDataStream(selectedStream)->getName();
+                selectedStreamSourceNodeId = getDataStream(selectedStream)->getSourceNodeId();
+                selectedStreamSampleRate = getDataStream(selectedStream)->getSampleRate();
                 
                 Parameter* p =  getDataStream(selectedStream)->getParameter("Channels");
                 auto editor = static_cast<ZmqInterfaceEditor*>(getEditor());

@@ -23,24 +23,13 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  
  */
-/*
-  ==============================================================================
-
-    ZmqInterface.h
-    Created: 19 Sep 2015 9:47:12pm
-    Author:  Francesco Battaglia
-
-  ==============================================================================
-*/
 
 #ifndef ZMQINTERFACE_H_INCLUDED
 #define ZMQINTERFACE_H_INCLUDED
 
-
 #include <ProcessorHeaders.h>
 
 #include <queue>
-
 
 struct ZmqApplication {
     String name;
@@ -49,10 +38,6 @@ struct ZmqApplication {
     bool alive;
 };
 
-
-//=============================================================================
-/*
- */
 class ZmqInterface    : public GenericProcessor, public Thread
 {
 public:
@@ -61,86 +46,83 @@ public:
     
     /** The class destructor, used to deallocate memory */
     ~ZmqInterface();
-    
-    /** Defines the functionality of the processor.
-     
-     The process method is called every time a new data buffer is available.
-     
-     Processors can either use this method to add new data, manipulate existing
-     data, or send data to an external target (such as a display or other hardware).
-     
-     Continuous signals arrive in the "buffer" variable, event data (such as TTLs
-     and spikes) is contained in the "events" variable, and "nSamples" holds the
-     number of continous samples in the current buffer (which may differ from the
-     size of the buffer).
-     */
-    //virtual void process(AudioSampleBuffer& buffer, MidiBuffer& events);
-    void process(AudioSampleBuffer& continuousBuffer);
-    
-    // /** Any variables used by the "process" function _must_ be modified only through
-    //  this method while data acquisition is active. If they are modified in any
-    //  other way, the application will crash.  */
-    // void setParameter(int parameterIndex, float newValue);
-    
+
+    /** Creates the custom editor*/
     AudioProcessorEditor* createEditor();
     
-    bool hasEditor() const
-    {
-        return true;
-    }
-    
+    /** Streams incoming data over a ZMQ socket */
+    void process(AudioBuffer<float>& continuousBuffer);
+
+    /** Called whenever the settings of upstream plugins have changed */
     void updateSettings() override;
 
     /** Called when a parameter is updated*/
     void parameterValueChanged(Parameter* param) override;
-    
-    bool isReady();
-    
+
+    /** Runs the ZMQ thread*/
     void run();
 
+    /** Returns a list of connected applications */
     OwnedArray<ZmqApplication> *getApplicationList();
 
-    // TODO void saveCustomParametersToXml(XmlElement* parentElement);
-    // TODO void loadCustomParametersFromXml();
-
-    bool threadRunning ;
-    // TODO void setNewListeningPort(int port);
-#if 0
-    void setPorts(uint32_t newDataPort, uint32_t newListenPort);
-    uint32_t getDataPort () const { return dataPort; }
-    uint32_t getListenPort () const { return listenPort; }
-#endif
+    bool threadRunning;
 
     uint16 selectedStream;
+    String selectedStreamName;
+    int selectedStreamSourceNodeId;
+    float selectedStreamSampleRate;
 
 private:
+
+    /** Creates the ZMQ context */
     int createContext();
+
+    /** Opens the listening socket */
     void openListenSocket();
+
+    /** Opens the kill socket */
     void openKillSocket();
+
+    /** Opens the pipe out socket */
     void openPipeOutSocket();
+
+    /** Closes the listening socket */
     int closeListenSocket();
+
+    /** Creates the data socket */
     int createDataSocket();
+
+    /** Closes the data socket */
     int closeDataSocket();
 
+    /** Called whenever a new TTL event arrives */
     void handleTTLEvent(TTLEventPtr event) override;
+
+    /** Called whenever a new spike arrives */
     void handleSpike (SpikePtr spike) override;
-    int sendData(float *data, int channelNum, int nSamples, int nRealSamples, 
-                 int64 timestamp, int sampleRate);
+
+    /** Sends continuous data for one channel over the ZMQ socket */
+    int sendData(float *data, int channelNum, int nSamples, int64 sampleNumber, float sampleRate);
+
+    /** Sends an event over the ZMQ socket */
     int sendEvent( uint8 type,
                   int64 sampleNum,
-                  uint16 eventStream,
-                  uint16 eventChannel,
+                  int sourceNodeId,
                   size_t numBytes,
                   const uint8* eventData);
+
+    /** Sends a spike over the ZMQ socket */
     int sendSpikeEvent(const SpikePtr spike);
     
-    // Currently only supports events related to keeping track of connected Applications
+    /** Currently only supports events related to keeping track of connected applications */
     int receiveEvents();
+
+    /** Checks for connected applications */
     void checkForApplications();
     
+    /** Template for sending a named parameter */
     template<typename T> int sendParam(String name, T value);
 
-    
     void *context;
     void *socket;
     void *listenSocket;
@@ -149,11 +131,10 @@ private:
     void *pipeInSocket;
     void *pipeOutSocket;
     
-    
     OwnedArray<ZmqApplication> applications;
     
     int messageNumber;
-    int dataPort; //TODO make this editable
+    int dataPort;
     int listenPort;
 
     Array<int> selectedChannels;
@@ -162,10 +143,6 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ZmqInterface);
     
 };
-
-
-
-
 
 
 #endif  // ZMQINTERFACE_H_INCLUDED
