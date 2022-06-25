@@ -24,19 +24,6 @@
  
  */
 
-/*
-  ==============================================================================
-
-    ZmqInterfaceEditor.cpp
-    Created: 22 Sep 2015 9:42:44am
-    Author:  Francesco Battaglia
-
-  ==============================================================================
-*/
-
-
-
-
 #include "ZmqInterfaceEditor.h"
 #include "ZmqInterface.h"
 
@@ -44,15 +31,16 @@ class ZmqInterfaceEditor::ZmqInterfaceEditorListBox: public ListBox,
 private ListBoxModel, public AsyncUpdater
 {
 public:
+    
     ZmqInterfaceEditorListBox(const String noItemsText, ZmqInterfaceEditor *e):
-    ListBox(String(), nullptr), noItemsMessage(noItemsText)
+        ListBox(String(), nullptr), noItemsMessage(noItemsText)
     {
         editor = e;
         setModel(this);
         
-        backgroundGradient = ColourGradient(Colour(190, 190, 190), 0.0f, 0.0f,
-                                            Colour(185, 185, 185), 0.0f, 120.0f, false);
-        backgroundGradient.addColour(0.2f, Colour(155, 155, 155));
+        backgroundGradient = ColourGradient(Colour(220, 220, 220), 0.0f, 0.0f,
+                                            Colour(195, 195, 195), 0.0f, 120.0f, false);
+        backgroundGradient.addColour(0.2f, Colour(185, 185, 185));
         
         backgroundColor = Colour(155, 155, 155);
         
@@ -119,21 +107,18 @@ public:
         
             if (!CoreServices::getAcquisitionStatus())
             {
-                g.drawText ("Waiting for acqusition",
-                            0, 0, getWidth(), getHeight() / 2,
-                            Justification::centred, true);
+                g.drawText ("Waiting...",
+                            10, 0, getWidth(), getHeight() / 2,
+                            Justification::centredLeft, true);
             }
             else
             {
                 g.drawText (noItemsMessage,
-                        0, 0, getWidth(), getHeight() / 2,
-                        Justification::centred, true);
+                        10, 0, getWidth(), getHeight() / 2,
+                        Justification::centredLeft, true);
             }
         }
     }
-    
-    
-    
     
 private:
     const String noItemsMessage;
@@ -158,25 +143,26 @@ ZmqInterfaceEditor::ZmqInterfaceEditor(GenericProcessor *parentNode): GenericEdi
 
     desiredWidth = 280;
 
-    listBox = std::make_unique<ZmqInterfaceEditorListBox>(String("No App connected"), this);
-    listBox->setBounds(100,45,170,80);
+    listBox = std::make_unique<ZmqInterfaceEditorListBox>(String("None"), this);
+    listBox->setBounds(112,45,160,80);
     addAndMakeVisible(listBox.get());
 
-    listTitle = std::make_unique<Label>("ListBox Label", "List of connected apps:");
+    listTitle = std::make_unique<Label>("ListBox Label", "Connected apps:");
     listTitle->setColour(Label::textColourId, Colours::black);
-    listTitle->setBounds(100,27,170,15);
+    listTitle->setBounds(112,27,160,15);
     listTitle->setFont(Font("Fira Code", "SemiBold", 14.0f));
     addAndMakeVisible(listTitle.get());
 
-    addComboBoxParameterEditor("Stream", 10, 22);
+    addComboBoxParameterEditor("Stream", 15, 22);
+    parameterEditors.getLast()->setBounds(15, 22, 120, 42);
     
     // addSelectedChannelsParameterEditor("Channels", 10, 67);
     Parameter* maskChansParam = getProcessor()->getParameter("Channels");
     maskchannelsEditor = std::make_unique<MaskChannelsParameterEditor>(maskChansParam);
-    maskchannelsEditor->setBounds(10, 67, maskchannelsEditor->getWidth(), maskchannelsEditor->getHeight());
+    maskchannelsEditor->setBounds(15, 67, maskchannelsEditor->getWidth(), maskchannelsEditor->getHeight());
     addAndMakeVisible(maskchannelsEditor.get());
     
-    addTextBoxParameterEditor("data_port", 10, 87);
+    addTextBoxParameterEditor("data_port", 15, 87);
 }
 
 ZmqInterfaceEditor::~ZmqInterfaceEditor()

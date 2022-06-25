@@ -47,13 +47,23 @@ struct ZmqApplication;
 class ZmqInterfaceEditor: public GenericEditor
 {
 public:
+
+    /** Constructor */
     ZmqInterfaceEditor(GenericProcessor *parentNode);
+
+    /** Destructor */
     virtual ~ZmqInterfaceEditor();
 
+    /** Refresh list of connected apps */
     void refreshListAsync();
+
+    /** Updates list of connected apps */
     void startAcquisition() override;
+
+    /** Updates list of connected apps */
     void stopAcquisition() override;
 
+    /** Sets pointer to mask channels underlying parameter */
     void updateMaskChannelsParameter(Parameter* param);
 
 private:
