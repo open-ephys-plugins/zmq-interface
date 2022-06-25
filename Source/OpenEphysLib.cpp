@@ -57,7 +57,7 @@ extern "C" EXPORT int getPluginInfo(int index, Plugin::PluginInfo* info)
             info->type = Plugin::PROCESSOR; //Type of plugin. See "Source/Processors/PluginManager/OpenEphysPlugin.h" for complete info about the different type structures
             //For processor
             info->processor.name = "ZMQ Interface"; //Processor name shown in the GUI
-            info->processor.type = Plugin::Processor::FILTER; //Type of processor. Can be FilterProcessor, SourceProcessor, SinkProcessor or UtilityProcessor. Specifies where on the processor list will appear
+            info->processor.type = Plugin::Processor::SINK; //Type of processor. Can be FilterProcessor, SourceProcessor, SinkProcessor or UtilityProcessor. Specifies where on the processor list will appear
             info->processor.creator = &(Plugin::createProcessor<ZmqInterface>); //Class factory pointer. Replace "ExampleProcessor" with the name of your class.
             break;
         default:
