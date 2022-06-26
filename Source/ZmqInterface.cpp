@@ -477,7 +477,7 @@ int ZmqInterface::sendEvent( uint8 type,
     
     DynamicObject::Ptr obj = new DynamicObject();
     
-    obj->setProperty("message_no", messageNumber);
+    obj->setProperty("message_num", messageNumber);
     obj->setProperty("type", "event");
     
     DynamicObject::Ptr c_obj = new DynamicObject();
