@@ -1,6 +1,6 @@
 # ZMQ Interface
 
-![zmq-interface-screenshot](Resources/zmq-interface.png)
+![zmq-interface-screenshot](Resources/zmqinterface.png)
 
 Streams continuous data, events, and spikes via [ZeroMQ](http://zeromq.org/).
 
