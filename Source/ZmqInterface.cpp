@@ -714,6 +714,9 @@ void ZmqInterface::process(AudioBuffer<float>& buffer)
             int64 sampleNum = getFirstSampleNumberForBlock(stream->getStreamId()) ;
             int numSamples = getNumSamplesInBlock(selectedStream);
 
+            if(numSamples == 0)
+                continue;
+
             for(auto chan : selectedChannels)
             {
                 int globalChanIndex = stream->getContinuousChannels().getUnchecked(chan)->getGlobalIndex();
