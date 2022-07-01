@@ -17,7 +17,7 @@ jobs:
     - name: setup
       run: |
         cd ../..
-        git clone https://github.com/open-ephys/plugin-GUI.git --branch development-juce6
+        git clone https://github.com/open-ephys/plugin-GUI.git
         cd plugin-GUI/Build && cmake -G "Xcode" ..
     - name: build
       run: |
@@ -28,6 +28,7 @@ jobs:
 #    - name: test
 #      run: cd build && ctest
     - name: deploy
+      if: github.ref == 'refs/heads/main'
       env:
         artifactoryApiKey: ${{ secrets.artifactoryApiKey }}
         build_dir: "Build/Release"
