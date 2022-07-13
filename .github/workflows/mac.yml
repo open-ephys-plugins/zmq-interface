@@ -17,14 +17,13 @@ jobs:
     - name: setup
       run: |
         cd ../..
-        git clone https://github.com/open-ephys/plugin-GUI.git
+        git clone https://github.com/open-ephys/plugin-GUI.git --branch main
         cd plugin-GUI/Build && cmake -G "Xcode" ..
     - name: build
       run: |
         cd Build
         cmake -G "Xcode" ..
         xcodebuild -configuration Release
-        install_name_tool -change /usr/local/lib/libzmq.5.dylib @rpath/libzmq.5.dylib Release/ZMQInterface.bundle/Contents/MacOS/ZMQInterface
 #    - name: test
 #      run: cd build && ctest
     - name: deploy

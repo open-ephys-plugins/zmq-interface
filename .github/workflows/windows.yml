@@ -20,7 +20,7 @@ jobs:
         package: "open-ephys-lib"
       run: |
         cd ../..
-        git clone https://github.com/open-ephys/plugin-GUI.git
+        git clone https://github.com/open-ephys/plugin-GUI.git --branch main
         cd plugin-GUI/Build
         cmake -G "Visual Studio 16 2019" -A x64 .. 
         mkdir Release && cd Release
@@ -54,7 +54,10 @@ jobs:
         new_plugin_ver=$tag-API$plugin_api
         mkdir plugins
         cp $build_dir/*.dll plugins
+        mkdir shared
+        cp -r libs/windows/bin/x64/* shared
         zipfile=${package}_${new_plugin_ver}.zip
         powershell Compress-Archive -Path "plugins" -DestinationPath ${zipfile}
+        powershell Compress-Archive -U -Path "shared" -DestinationPath ${zipfile}
         curl -H "X-JFrog-Art-Api:$artifactoryApiKey" -T $zipfile "https://openephys.jfrog.io/artifactory/ZMQInterface-plugin/windows/$zipfile"
       shell: bash
