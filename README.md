@@ -7,18 +7,20 @@ Streams continuous data, events, and spikes via [ZeroMQ](http://zeromq.org/).
 
 ## Installation
 
-(Coming soon)
+This plugin can be added via the Open Ephys GUI Plugin Installer. To access the Plugin Installer, press **ctrl-P** or **⌘P** from inside the GUI. Once the installer is loaded, browse to the "ZMQ Interface" plugin and click "Install."
 
 
 ## Usage
 
-(add link to documentation)
+Instructions for using the ZMQ Interface plugin are available [here](https://open-ephys.github.io/gui-docs/User-Manual/Plugins/ZMQ-Interface.html).
 
 
 
 ## Building from source
 
 First, follow the instructions on [this page](https://open-ephys.github.io/gui-docs/Developer-Guide/Compiling-the-GUI.html) to build the Open Ephys GUI.
+
+**Important:** This plugin is intended for use with the latest version of the GUI (0.6.0 and higher). The GUI should be compiled from the [`main`](https://github.com/open-ephys/plugin-gui/tree/main) branch, rather than the former `master` branch.
 
 Then, clone this repository into a directory at the same level as the `plugin-GUI`, e.g.:
  
@@ -63,7 +65,7 @@ make -j
 make install
 ```
 
-This will build the plugin and copy the `.so` file into the GUI's `plugins` directory. The next time you launch the GUI compiled version of the GUI, the ZMQ Interface plugin should be available.
+This will build the plugin and copy the `.so` file into the GUI's `plugins` directory. The next time you launch the compiled version of the GUI, the ZMQ Interface plugin should be available.
 
 
 ### macOS
