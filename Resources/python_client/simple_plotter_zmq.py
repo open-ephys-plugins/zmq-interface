@@ -43,6 +43,7 @@ class SimplePlotter(PlotProcess):
         print("starting plot")
         self.figure, self.ax = plt.subplots()
         plt.subplots_adjust(left=0.1, bottom=0.2)
+        self.ax.set_facecolor('#001230')
         axcolor = 'lightgoldenrodyellow'
         axylim = plt.axes([0.1, 0.05, 0.65, 0.03], facecolor=axcolor)
         sylim = Slider(axylim, 'Ylim', 1, 600, valinit=ylim0)
@@ -56,6 +57,8 @@ class SimplePlotter(PlotProcess):
         sylim.on_changed(update)
 
         self.hl, = self.ax.plot([], [])
+        self.hl.set_color('#d92eab')
+        self.hl.set_linewidth(0.5)
         self.ax.set_autoscaley_on(True)
         self.ax.margins(y=0.1)
         self.ax.set_xlim(0., 1)
