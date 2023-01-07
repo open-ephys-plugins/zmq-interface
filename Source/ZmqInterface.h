@@ -38,7 +38,7 @@ struct ZmqApplication {
     bool alive;
 };
 
-class ZmqInterface    : public GenericProcessor, public Thread
+class ZmqInterface    : public GenericProcessor, public Thread, public Timer
 {
 public:
     /** The class constructor, used to initialize any members. */
@@ -59,13 +59,8 @@ public:
     /** Called when a parameter is updated*/
     void parameterValueChanged(Parameter* param) override;
 
-    /** Runs the ZMQ thread*/
-    void run();
-
     /** Returns a list of connected applications */
     OwnedArray<ZmqApplication> *getApplicationList();
-
-    bool threadRunning;
 
     uint16 selectedStream;
     String selectedStreamName;
@@ -73,6 +68,9 @@ public:
     float selectedStreamSampleRate;
 
 private:
+
+    /** Runs the ZMQ polling thread*/
+    void run();
 
     /** Creates the ZMQ context */
     int createContext();
@@ -89,11 +87,17 @@ private:
     /** Closes the listening socket */
     int closeListenSocket();
 
-    /** Creates the data socket */
-    int createDataSocket();
+    /** Opens the data socket */
+    int openDataSocket();
 
     /** Closes the data socket */
     int closeDataSocket();
+
+    /** Called at the start of acquisition */
+    bool startAcquisition();
+    
+    /** Called at the end of acquisition */
+    bool stopAcquisition();
 
     /** Called whenever a new TTL event arrives */
     void handleTTLEvent(TTLEventPtr event) override;
@@ -119,10 +123,10 @@ private:
 
     /** Checks for connected applications */
     void checkForApplications();
-    
-    /** Template for sending a named parameter */
-    template<typename T> int sendParam(String name, T value);
 
+    /** Calls checkForApplications() */
+    void timerCallback();
+    
     void *context;
     void *socket;
     void *listenSocket;

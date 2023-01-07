@@ -53,17 +53,17 @@ struct EventData {
 ZmqInterface::ZmqInterface(const String& processorName)
     : GenericProcessor(processorName), Thread("ZMQ thread")
 {
-    context = 0;
-    socket = 0;
-    listenSocket = 0;
-    controlSocket = 0;
-    killSocket = 0;
-    pipeInSocket = 0;
-    pipeOutSocket = 0;
+    context = nullptr;
+    socket = nullptr;
+    listenSocket = nullptr;
+    controlSocket = nullptr;
+    killSocket = nullptr;
+    pipeInSocket = nullptr;
+    pipeOutSocket = nullptr;
     
     messageNumber = 0;
     dataPort = 5556;
-    listenPort = 5557;
+    listenPort = dataPort + 1;
     selectedStream = 0;
     selectedStreamSourceNodeId = 0;
     selectedStreamName = "";
@@ -76,30 +76,31 @@ ZmqInterface::ZmqInterface(const String& processorName)
     addIntParameter(Parameter::GLOBAL_SCOPE, "data_port", "Port number to send data", dataPort, 1000, 65535, true);
 
     createContext();
-    threadRunning = false;
-    openListenSocket();
-    openKillSocket();
     
-    // TODO mock implementation
+    //openListenSocket();
+    //openDataSocket();
+    openKillSocket();
+    openPipeOutSocket();
+
 }
 
 ZmqInterface::~ZmqInterface()
 {
-    threadRunning = false;
-    // send the kill signal to the thread
-    
-    zmq_msg_t messageEnvelope;
-    zmq_msg_init_size(&messageEnvelope, strlen("STOP")+1);
-    memcpy(zmq_msg_data(&messageEnvelope), "STOP", strlen("STOP")+1);
-    zmq_msg_send(&messageEnvelope, killSocket, 0);
-    zmq_msg_close(&messageEnvelope);
-    
-    stopThread(200); // this is probably overkill but won't hurt
+    //LOGD("Sending stop message");
+    //zmq_msg_t messageEnvelope;
+    //zmq_msg_init_size(&messageEnvelope, strlen("STOP")+1);
+    //memcpy(zmq_msg_data(&messageEnvelope), "STOP", strlen("STOP")+1);
+   // zmq_msg_send(&messageEnvelope, killSocket, 0);
+   // zmq_msg_close(&messageEnvelope);    
+   // LOGD("Sent stop message");
+
     closeDataSocket();
-    zmq_close(killSocket);
-    zmq_close(pipeOutSocket);
+    closeListenSocket(); // stop the polling thread
     
-    sleep(500);
+    zmq_close(pipeOutSocket);
+    zmq_close(killSocket);
+
+    sleep(250);
     
     if (context)
     {
@@ -122,22 +123,29 @@ OwnedArray<ZmqApplication> *ZmqInterface::getApplicationList()
 
 int ZmqInterface::createContext()
 {
+
+	LOGD("Creating ZMQ context");
+    
     context = zmq_ctx_new();
     if (!context)
         return -1;
     return 0;
 }
 
-int ZmqInterface::createDataSocket()
+int ZmqInterface::openDataSocket()
 {
+
     if (!socket)
     {
+
+        LOGD("Opening data socket");
+        
         socket = zmq_socket(context, ZMQ_PUB);
         if (!socket)
             return -1;
         String urlstring;
         urlstring = String("tcp://*:") + String(dataPort);
-       LOGD("[ZMQ] ", urlstring);
+        LOGD("[ZMQ data socket] ", urlstring);
         int rc = zmq_bind(socket, urlstring.toRawUTF8());
         if (rc)
         {
@@ -146,34 +154,70 @@ int ZmqInterface::createDataSocket()
             jassert(false);
         }
     }
+    
     return 0;
 }
 
 int ZmqInterface::closeDataSocket()
 {
+
     if (socket)
     {
-        LOGD("Close data socket");
+
+        LOGD("Closing data socket");
+        
         int rc = zmq_close(socket);
         jassert(rc==0);
-        socket = 0;
+        socket = nullptr;
     }
     return 0;
 }
 
 void ZmqInterface::openListenSocket()
 {
-    startThread();
+
+    if (!listenSocket)
+    {
+        LOGD("Opening listening socket");
+        
+        listenSocket = zmq_socket(context, ZMQ_REP);
+        String urlstring;
+        urlstring = String("tcp://*:") + String(listenPort);
+        LOGD("[ZMQ listen socket] ", urlstring);
+        int rc = zmq_bind(listenSocket, urlstring.toRawUTF8()); // give the chance to change the port
+
+        if (rc != 0) // port is taken
+        {
+            dataPort += 2;
+            listenPort = dataPort + 1;
+
+            getParameter("data_port")->setNextValue(dataPort);
+            return;
+
+        }
+
+        startThread();
+        LOGD("Starting timer callbacks");
+        startTimer(500);
+        
+    }
+
 }
 
 int ZmqInterface::closeListenSocket()
 {
     int rc = 0;
+
+    LOGD("Closing listening socket");
+    
+    stopTimer();
+
+    stopThread(500);
+    
     if (listenSocket)
     {
-        LOGD("Close listen socket");
         rc = zmq_close(listenSocket);
-        listenSocket = 0;
+        listenSocket = nullptr;
     }
     
     return rc;
@@ -187,38 +231,49 @@ void ZmqInterface::openKillSocket()
 
 void ZmqInterface::openPipeOutSocket()
 {
+
+    LOGD("Opening pipeout socket");
+    
     pipeOutSocket = zmq_socket(context, ZMQ_PAIR);
     zmq_bind(pipeOutSocket, "inproc://zmqthreadpipe");
+ 
 }
+
+void ZmqInterface::timerCallback()
+{
+
+    receiveEvents();
+    
+    checkForApplications();
+}
+
+
 
 void ZmqInterface::run()
 {
-    //OutputDebugStringW(L"ZMQ plugin starting.\n");
-    listenSocket = zmq_socket(context, ZMQ_REP);
-    String urlstring;
-    urlstring = String("tcp://*:") + String(listenPort);
-    int rc = zmq_bind(listenSocket, urlstring.toRawUTF8()); // give the chance to change the port
-    jassert(rc == 0);
-    threadRunning = true;
+    LOGD("Starting ZMQ thread");
+
     char* buffer = new char[MAX_MESSAGE_LENGTH];
+
+    LOGD("ZMQ: creating control socket");
+    controlSocket = zmq_socket(context, ZMQ_PAIR);
+    zmq_bind(controlSocket, "inproc://zmqthreadcontrol");
+
+    LOGD("ZMQ: creating pipe in socket");
+    pipeInSocket = zmq_socket(context, ZMQ_PAIR);
+    zmq_connect(pipeInSocket, "inproc://zmqthreadpipe");
 
     int size;
 
-    controlSocket = zmq_socket(context, ZMQ_PAIR);
-    zmq_bind(controlSocket, "inproc://zmqthreadcontrol");
-    
-    pipeInSocket = zmq_socket(context, ZMQ_PAIR);
-    zmq_connect(pipeInSocket, "inproc://zmqthreadpipe");
-    
     zmq_pollitem_t items [] = {
         { listenSocket, 0, ZMQ_POLLIN, 0 },
         { controlSocket, 0, ZMQ_POLLIN, 0 }
     };
     
-
-    while (threadRunning && (!threadShouldExit()))
+    while (!threadShouldExit())
     {
-        zmq_poll (items, 2, -1);
+        zmq_poll (items, 2, 100);
+        
         if (items[0].revents & ZMQ_POLLIN)
         {
             size = zmq_recv(listenSocket, buffer, MAX_MESSAGE_LENGTH-1, 0);
@@ -283,21 +338,21 @@ void ZmqInterface::run()
             {
                 response = String("JSON message could not be read");
             }
+            
             zmq_send(listenSocket, response.getCharPointer(), response.length(), 0);
-            if ((!threadRunning) || threadShouldExit())
-                break; // we're exiting
 
         }
-        else
-            break;
         
     }
-    closeListenSocket();
     
+
+    delete[] buffer;
+
     zmq_close(pipeInSocket);
     zmq_close(controlSocket);
-    delete[] buffer;
-    threadRunning = false;
+    pipeInSocket = nullptr;
+    controlSocket = nullptr;
+
     return;
 }
 
@@ -344,6 +399,19 @@ void ZmqInterface::run()
  and then a possible data packet
  */
 
+bool ZmqInterface::startAcquisition()
+{
+    messageNumber = 0;
+
+    return true;
+}
+
+bool ZmqInterface::stopAcquisition()
+{
+    LOGC("ZMQ Interface -- total messages sent: ", messageNumber);
+
+    return true;
+}
 
 int ZmqInterface::sendData(float *data, 
     int channelNum, 
@@ -527,56 +595,6 @@ int ZmqInterface::sendEvent( uint8 type,
     return size;
 }
 
-template<typename T> int ZmqInterface::sendParam(String name, T value)
-{
-    int size;
-    
-    messageNumber++;
-    
-//    MemoryOutputStream jsonHeader;
-//    jsonHeader << "{ \"messageNo\": " << messageNumber << "," << newLine;
-//    jsonHeader << "  \"type\": \"param\"," << newLine;
-//    jsonHeader << " \"content\": " << newLine;
-//    jsonHeader << " { \"" << name << "\": " << value  << newLine;
-//    jsonHeader << "}," << newLine;
-//    jsonHeader << " \"dataSize\": " << 0 << newLine;
-//    jsonHeader << "}";
-    
-    
-    DynamicObject::Ptr obj = new DynamicObject();
-    
-    obj->setProperty("message_no", messageNumber);
-    obj->setProperty("type", "event");
-    DynamicObject::Ptr c_obj = new DynamicObject();
-    c_obj->setProperty(name, value);
-    
-    obj->setProperty("content", var(c_obj));
-    obj->setProperty("data_size", 0);
-    
-    var json (obj);
-    String s = JSON::toString(json);
-    void *headerData = (void *)s.toRawUTF8();
-    size_t headerSize = s.length();
-    
-    zmq_msg_t messageEnvelope;
-    zmq_msg_init_size(&messageEnvelope, strlen("PARAM")+1);
-    memcpy(zmq_msg_data(&messageEnvelope), "PARAM", strlen("PARAM")+1);
-    size = zmq_msg_send(&messageEnvelope, socket, ZMQ_SNDMORE);
-    jassert(size != -1);
-    zmq_msg_close(&messageEnvelope);
-    
-    
-    zmq_msg_t messageHeader;
-    zmq_msg_init_size(&messageHeader, headerSize);
-    memcpy(zmq_msg_data(&messageHeader), headerData, headerSize);
-    size = zmq_msg_send(&messageHeader, socket, 0);
-    jassert(size != -1);
-    zmq_msg_close(&messageHeader);
-    
-    return size;
-}
-
-
 
 void ZmqInterface::handleTTLEvent(TTLEventPtr event)
 {
@@ -649,23 +667,13 @@ int ZmqInterface::receiveEvents()
             LOGC("Adding new application ", app->name, " ", app->Uuid);
             ZmqInterfaceEditor *zed =    dynamic_cast<ZmqInterfaceEditor *> (getEditor());
             zed->refreshListAsync();
-//            MessageManagerLock mmlock;
-//            editor->repaint();
     
         }
 
         if (ed.isEvent) {
             LOGD("ZMQ event received");
         }
-#if 0
-        if (ed.isEvent) {
-            addEvent(events, ed.type, ed.sampleNum, ed.eventId, ed.eventChannel, ed.numBytes, NULL, false);
-        }
 
-        //void addEvent(int channelIndex, const Event* event, int sampleNum);
-        //void addEvent(const EventChannel* channel, const Event* event, int sampleNum);
-        // TODO allow for event data
-#endif
     }
 
     return 0;
@@ -673,22 +681,18 @@ int ZmqInterface::receiveEvents()
 
 void ZmqInterface::checkForApplications()
 {
+    
     time_t timeNow = time(NULL);
+
     for (int i = 0; i < applications.size(); i++)
     {
         ZmqApplication *app = applications[i];
-        ZmqInterfaceEditor *zed =    dynamic_cast<ZmqInterfaceEditor *> (getEditor());
 
-        if( (timeNow - app->lastSeen) > 30 && !app->alive)
-        {
-            applications.remove(i);
-            zed->refreshListAsync();
-        }
-
-        if ((timeNow - app->lastSeen) > 10 && app->alive)
+        if ((timeNow - app->lastSeen) > 5 && app->alive)
         {
             app->alive = false;
-            LOGC("App ", app->name, " not alive");
+            LOGC("App ", app->name, " no longer alive");
+            ZmqInterfaceEditor* zed = dynamic_cast<ZmqInterfaceEditor*> (getEditor());
             zed->refreshListAsync();
         }
     }
@@ -696,38 +700,31 @@ void ZmqInterface::checkForApplications()
 
 void ZmqInterface::process(AudioBuffer<float>& buffer)
 {
-    if (!socket)
-        createDataSocket();
-    
-    if (!pipeOutSocket)
-        openPipeOutSocket();
 
     checkForEvents(true); // see if we got any TTL events or spikes
 
     for (auto stream : dataStreams)
     {
-        
+
         if ((*stream)["enable_stream"]
             && stream->getStreamId() == selectedStream)
         {
             // Send the sample number of the first sample in the buffer block
-            int64 sampleNum = getFirstSampleNumberForBlock(stream->getStreamId()) ;
+            int64 sampleNum = getFirstSampleNumberForBlock(stream->getStreamId());
             int numSamples = getNumSamplesInBlock(selectedStream);
 
-            if(numSamples == 0)
+            if (numSamples == 0)
                 continue;
 
-            for(auto chan : selectedChannels)
+            for (auto chan : selectedChannels)
             {
                 int globalChanIndex = stream->getContinuousChannels().getUnchecked(chan)->getGlobalIndex();
-                sendData(buffer.getWritePointer(globalChanIndex), chan, 
+                sendData(buffer.getWritePointer(globalChanIndex), chan,
                     numSamples, sampleNum, selectedStreamSampleRate);
             }
         }
     }
 
-    receiveEvents();
-    checkForApplications();
 }
 
 void ZmqInterface::updateSettings()
@@ -746,11 +743,16 @@ void ZmqInterface::updateSettings()
     getEditor()->updateView();
 
     parameterValueChanged(getParameter("Stream"));
+
+    openListenSocket();
+    openDataSocket();
 }
 
 
 void ZmqInterface::parameterValueChanged(Parameter* param)
 {
+    std::cout << "Parameter changed: " << param->getName() << std::endl;
+    
     if (param->getName().equalsIgnoreCase("Channels"))
     {   
         if(param->getStreamId() == selectedStream)
@@ -781,8 +783,13 @@ void ZmqInterface::parameterValueChanged(Parameter* param)
     }
     else if (param->getName().equalsIgnoreCase("data_port"))
     {
-        // close previous data socket and assign new data port
+        // close previous sockets and assign new ports
+        
+        closeListenSocket();
         closeDataSocket();
         dataPort = static_cast<IntParameter*>(param)->getIntValue();
+        listenPort = dataPort + 1;
+        openListenSocket();
+        openDataSocket();
     }
 }

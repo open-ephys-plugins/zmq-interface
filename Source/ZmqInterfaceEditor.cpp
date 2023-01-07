@@ -70,7 +70,9 @@ public:
     
     void paintListBoxItem (int row, Graphics& g, int width, int height, bool rowIsSelected) override
     {
+        
         OwnedArray<ZmqApplication> *items = editor->getApplicationList();
+        
         if (isPositiveAndBelow (row, items->size()))
         {
             g.fillAll(Colour(155, 155, 155));
