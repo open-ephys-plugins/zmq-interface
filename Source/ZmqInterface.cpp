@@ -693,7 +693,9 @@ void ZmqInterface::checkForApplications()
             app->alive = false;
             LOGC("App ", app->name, " no longer alive");
             ZmqInterfaceEditor* zed = dynamic_cast<ZmqInterfaceEditor*> (getEditor());
-            zed->refreshListAsync();
+            
+            if (zed != nullptr)
+                zed->refreshListAsync();
         }
     }
 }
