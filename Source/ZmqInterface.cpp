@@ -752,9 +752,7 @@ void ZmqInterface::updateSettings()
 
 
 void ZmqInterface::parameterValueChanged(Parameter* param)
-{
-    std::cout << "Parameter changed: " << param->getName() << std::endl;
-    
+{    
     if (param->getName().equalsIgnoreCase("Channels"))
     {   
         if(param->getStreamId() == selectedStream)
