@@ -44,7 +44,7 @@ extern "C" EXPORT void getLibInfo(Plugin::LibraryInfo* info)
     info->apiVersion = PLUGIN_API_VER; /*API version, defined by the GUI source.
                                         Should not be changed to ensure it is always equal to the one used in the latest codebase. The GUI refueses to load plugins with mismatched API versions */
     info->name = "ZMQ Interface"; //Name of the Library, used only for information
-    info->libVersion = "0.3.1"; //Version of the library, used only for information
+    info->libVersion = "0.3.2"; //Version of the library, used only for information
     info->numPlugins = NUM_PLUGINS;
 }
 
