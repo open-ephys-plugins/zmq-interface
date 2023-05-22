@@ -207,15 +207,15 @@ void ZmqInterface::openListenSocket()
 int ZmqInterface::closeListenSocket()
 {
     int rc = 0;
-
-    LOGD("Closing listening socket");
-    
-    stopTimer();
-
-    stopThread(500);
     
     if (listenSocket)
     {
+        LOGD("Closing listening socket");
+    
+        stopTimer();
+
+        stopThread(500);
+        
         rc = zmq_close(listenSocket);
         listenSocket = nullptr;
     }
@@ -783,13 +783,18 @@ void ZmqInterface::parameterValueChanged(Parameter* param)
     }
     else if (param->getName().equalsIgnoreCase("data_port"))
     {
-        // close previous sockets and assign new ports
+        int newDataPort = static_cast<IntParameter*>(param)->getIntValue();
         
-        closeListenSocket();
-        closeDataSocket();
-        dataPort = static_cast<IntParameter*>(param)->getIntValue();
-        listenPort = dataPort + 1;
-        openListenSocket();
-        openDataSocket();
+        if(dataPort != newDataPort)
+        {
+            // close previous sockets and assign new ports
+            
+            closeListenSocket();
+            closeDataSocket();
+            dataPort = newDataPort;
+            listenPort = dataPort + 1;
+            openListenSocket();
+            openDataSocket();
+        }
     }
 }
