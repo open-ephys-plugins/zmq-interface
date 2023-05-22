@@ -438,6 +438,7 @@ int ZmqInterface::sendData(float *data,
 
     obj->setProperty("content", var(c_obj));
     obj->setProperty("data_size", (int)(nSamples * sizeof(float)));
+    obj->setProperty("timestamp", Time::currentTimeMillis());
     
     var json(obj);
     
@@ -504,6 +505,8 @@ int ZmqInterface::sendSpikeEvent(const SpikePtr spike)
             c_obj->setProperty("threshold", t_var);
 
             obj->setProperty("spike", var(c_obj));
+            obj->setProperty("timestamp", Time::currentTimeMillis());
+
             var json (obj);
             String s = JSON::toString(json);
             void *headerData = (void *)s.toRawUTF8();
@@ -556,6 +559,7 @@ int ZmqInterface::sendEvent( uint8 type,
     
     obj->setProperty("content", var(c_obj));
     obj->setProperty("data_size", (int)numBytes);
+    obj->setProperty("timestamp", Time::currentTimeMillis());
     
     var json (obj);
     String s = JSON::toString(json);
