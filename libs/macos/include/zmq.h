@@ -1,32 +1,5 @@
-/*
-    Copyright (c) 2007-2016 Contributors as noted in the AUTHORS file
-
-    This file is part of libzmq, the ZeroMQ core engine in C++.
-
-    libzmq is free software; you can redistribute it and/or modify it under
-    the terms of the GNU Lesser General Public License (LGPL) as published
-    by the Free Software Foundation; either version 3 of the License, or
-    (at your option) any later version.
-
-    As a special exception, the Contributors give you permission to link
-    this library with independent modules to produce an executable,
-    regardless of the license terms of these independent modules, and to
-    copy and distribute the resulting executable under terms of your choice,
-    provided that you also meet, for each linked independent module, the
-    terms and conditions of the license of that module. An independent
-    module is a module which is not derived from or based on this library.
-    If you modify this library, you must extend this exception to your
-    version of the library.
-
-    libzmq is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-    License for more details.
-
-    You should have received a copy of the GNU Lesser General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-    *************************************************************************
+/* SPDX-License-Identifier: MPL-2.0 */
+/*  *************************************************************************
     NOTE to contributors. This file comprises the principal public contract
     for ZeroMQ API users. Any change to this file supplied in a stable
     release SHOULD not break existing applications.
@@ -41,7 +14,7 @@
 /*  Version macros for compile-time API version detection                     */
 #define ZMQ_VERSION_MAJOR 4
 #define ZMQ_VERSION_MINOR 3
-#define ZMQ_VERSION_PATCH 2
+#define ZMQ_VERSION_PATCH 5
 
 #define ZMQ_MAKE_VERSION(major, minor, patch)                                  \
     ((major) *10000 + (minor) *100 + (patch))
@@ -57,24 +30,11 @@ extern "C" {
 #endif
 #include <stddef.h>
 #include <stdio.h>
-#if defined _WIN32
-//  Set target version to Windows Server 2008, Windows Vista or higher.
-//  Windows XP (0x0501) is supported but without client & server socket types.
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0600
-#endif
-
-#ifdef __MINGW32__
-//  Require Windows XP or higher with MinGW for getaddrinfo().
-#if (_WIN32_WINNT >= 0x0501)
-#else
-#error You need at least Windows XP target
-#endif
-#endif
-#include <winsock2.h>
-#endif
 
 /*  Handle DSO symbol visibility                                             */
+#if defined ZMQ_NO_EXPORT
+#define ZMQ_EXPORT
+#else
 #if defined _WIN32
 #if defined ZMQ_STATIC
 #define ZMQ_EXPORT
@@ -90,6 +50,7 @@ extern "C" {
 #define ZMQ_EXPORT __attribute__ ((visibility ("default")))
 #else
 #define ZMQ_EXPORT
+#endif
 #endif
 #endif
 
@@ -115,6 +76,11 @@ typedef unsigned __int8 uint8_t;
 #endif
 #else
 #include <stdint.h>
+#endif
+
+#if !defined _WIN32
+// needed for sigset_t definition in zmq_ppoll
+#include <signal.h>
 #endif
 
 //  32-bit AIX's pollfd struct members are called reqevents and rtnevents so it
@@ -253,7 +219,8 @@ typedef struct zmq_msg_t
 {
 #if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_ARM64))
     __declspec(align (8)) unsigned char _[64];
-#elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_ARM_ARMV7VE))
+#elif defined(_MSC_VER)                                                        \
+  && (defined(_M_IX86) || defined(_M_ARM_ARMV7VE) || defined(_M_ARM))
     __declspec(align (4)) unsigned char _[64];
 #elif defined(__GNUC__) || defined(__INTEL_COMPILER)                           \
   || (defined(__SUNPRO_C) && __SUNPRO_C >= 0x590)                              \
@@ -264,7 +231,7 @@ typedef struct zmq_msg_t
 #endif
 } zmq_msg_t;
 
-typedef void(zmq_free_fn) (void *data_, void *hint_);
+typedef void (zmq_free_fn) (void *data_, void *hint_);
 
 ZMQ_EXPORT int zmq_msg_init (zmq_msg_t *msg_);
 ZMQ_EXPORT int zmq_msg_init_size (zmq_msg_t *msg_, size_t size_);
@@ -398,7 +365,7 @@ ZMQ_EXPORT const char *zmq_msg_gets (const zmq_msg_t *msg_,
 #define ZMQ_GSSAPI 3
 
 /*  RADIO-DISH protocol                                                       */
-#define ZMQ_GROUP_MAX_LENGTH 15
+#define ZMQ_GROUP_MAX_LENGTH 255
 
 /*  Deprecated options and aliases                                            */
 #define ZMQ_IDENTITY ZMQ_ROUTING_ID
@@ -475,6 +442,7 @@ ZMQ_EXPORT const char *zmq_msg_gets (const zmq_msg_t *msg_,
 #define ZMQ_PROTOCOL_ERROR_ZAP_BAD_VERSION 0x20000003
 #define ZMQ_PROTOCOL_ERROR_ZAP_INVALID_STATUS_CODE 0x20000004
 #define ZMQ_PROTOCOL_ERROR_ZAP_INVALID_METADATA 0x20000005
+#define ZMQ_PROTOCOL_ERROR_WS_UNSPECIFIED 0x30000000
 
 ZMQ_EXPORT void *zmq_socket (void *, int type_);
 ZMQ_EXPORT int zmq_close (void *s_);
@@ -492,6 +460,20 @@ zmq_send_const (void *s_, const void *buf_, size_t len_, int flags_);
 ZMQ_EXPORT int zmq_recv (void *s_, void *buf_, size_t len_, int flags_);
 ZMQ_EXPORT int zmq_socket_monitor (void *s_, const char *addr_, int events_);
 
+/******************************************************************************/
+/*  Hide socket fd type; this was before zmq_poller_event_t typedef below     */
+/******************************************************************************/
+
+#if defined _WIN32
+// Windows uses a pointer-sized unsigned integer to store the socket fd.
+#if defined _WIN64
+typedef unsigned __int64 zmq_fd_t;
+#else
+typedef unsigned int zmq_fd_t;
+#endif
+#else
+typedef int zmq_fd_t;
+#endif
 
 /******************************************************************************/
 /*  Deprecated I/O multiplexing. Prefer using zmq_poller API                  */
@@ -505,11 +487,7 @@ ZMQ_EXPORT int zmq_socket_monitor (void *s_, const char *addr_, int events_);
 typedef struct zmq_pollitem_t
 {
     void *socket;
-#if defined _WIN32
-    SOCKET fd;
-#else
-    int fd;
-#endif
+    zmq_fd_t fd;
     short events;
     short revents;
 } zmq_pollitem_t;
@@ -561,7 +539,7 @@ zmq_z85_encode (char *dest_, const uint8_t *data_, size_t size_);
 /*  Decode data with Z85 encoding. Returns decoded data                       */
 ZMQ_EXPORT uint8_t *zmq_z85_decode (uint8_t *dest_, const char *string_);
 
-/*  Generate z85-encoded public and private keypair with tweetnacl/libsodium. */
+/*  Generate z85-encoded public and private keypair with libsodium. */
 /*  Returns 0 on success.                                                     */
 ZMQ_EXPORT int zmq_curve_keypair (char *z85_public_key_, char *z85_secret_key_);
 
@@ -587,7 +565,7 @@ ZMQ_EXPORT void zmq_atomic_counter_destroy (void **counter_p_);
 
 #define ZMQ_HAVE_TIMERS
 
-typedef void(zmq_timer_fn) (int timer_id, void *arg);
+typedef void (zmq_timer_fn) (int timer_id, void *arg);
 
 ZMQ_EXPORT void *zmq_timers_new (void);
 ZMQ_EXPORT int zmq_timers_destroy (void **timers_p);
@@ -624,7 +602,7 @@ ZMQ_EXPORT unsigned long zmq_stopwatch_stop (void *watch_);
 /*  Sleeps for specified number of seconds.                                   */
 ZMQ_EXPORT void zmq_sleep (int seconds_);
 
-typedef void(zmq_thread_fn) (void *);
+typedef void (zmq_thread_fn) (void *);
 
 /* Start a thread. Returns a handle to the thread.                            */
 ZMQ_EXPORT void *zmq_threadstart (zmq_thread_fn *func_, void *arg_);
@@ -648,6 +626,8 @@ ZMQ_EXPORT void zmq_threadclose (void *thread_);
 #define ZMQ_GATHER 16
 #define ZMQ_SCATTER 17
 #define ZMQ_DGRAM 18
+#define ZMQ_PEER 19
+#define ZMQ_CHANNEL 20
 
 /*  DRAFT Socket options.                                                     */
 #define ZMQ_ZAP_ENFORCE_DOMAIN 93
@@ -660,19 +640,66 @@ ZMQ_EXPORT void zmq_threadclose (void *thread_);
 #define ZMQ_SOCKS_PASSWORD 100
 #define ZMQ_IN_BATCH_SIZE 101
 #define ZMQ_OUT_BATCH_SIZE 102
+#define ZMQ_WSS_KEY_PEM 103
+#define ZMQ_WSS_CERT_PEM 104
+#define ZMQ_WSS_TRUST_PEM 105
+#define ZMQ_WSS_HOSTNAME 106
+#define ZMQ_WSS_TRUST_SYSTEM 107
+#define ZMQ_ONLY_FIRST_SUBSCRIBE 108
+#define ZMQ_RECONNECT_STOP 109
+#define ZMQ_HELLO_MSG 110
+#define ZMQ_DISCONNECT_MSG 111
+#define ZMQ_PRIORITY 112
+#define ZMQ_BUSY_POLL 113
+#define ZMQ_HICCUP_MSG 114
+#define ZMQ_XSUB_VERBOSE_UNSUBSCRIBE 115
+#define ZMQ_TOPICS_COUNT 116
+#define ZMQ_NORM_MODE 117
+#define ZMQ_NORM_UNICAST_NACK 118
+#define ZMQ_NORM_BUFFER_SIZE 119
+#define ZMQ_NORM_SEGMENT_SIZE 120
+#define ZMQ_NORM_BLOCK_SIZE 121
+#define ZMQ_NORM_NUM_PARITY 122
+#define ZMQ_NORM_NUM_AUTOPARITY 123
+#define ZMQ_NORM_PUSH 124
+
+/*  DRAFT ZMQ_NORM_MODE options                                               */
+#define ZMQ_NORM_FIXED 0
+#define ZMQ_NORM_CC 1
+#define ZMQ_NORM_CCL 2
+#define ZMQ_NORM_CCE 3
+#define ZMQ_NORM_CCE_ECNONLY 4
+
+/*  DRAFT ZMQ_RECONNECT_STOP options                                          */
+#define ZMQ_RECONNECT_STOP_CONN_REFUSED 0x1
+#define ZMQ_RECONNECT_STOP_HANDSHAKE_FAILED 0x2
+#define ZMQ_RECONNECT_STOP_AFTER_DISCONNECT 0x4
 
 /*  DRAFT Context options                                                     */
 #define ZMQ_ZERO_COPY_RECV 10
 
+/*  DRAFT Context methods.                                                    */
+ZMQ_EXPORT int zmq_ctx_set_ext (void *context_,
+                                int option_,
+                                const void *optval_,
+                                size_t optvallen_);
+ZMQ_EXPORT int zmq_ctx_get_ext (void *context_,
+                                int option_,
+                                void *optval_,
+                                size_t *optvallen_);
+
 /*  DRAFT Socket methods.                                                     */
 ZMQ_EXPORT int zmq_join (void *s, const char *group);
 ZMQ_EXPORT int zmq_leave (void *s, const char *group);
+ZMQ_EXPORT uint32_t zmq_connect_peer (void *s_, const char *addr_);
 
 /*  DRAFT Msg methods.                                                        */
 ZMQ_EXPORT int zmq_msg_set_routing_id (zmq_msg_t *msg, uint32_t routing_id);
 ZMQ_EXPORT uint32_t zmq_msg_routing_id (zmq_msg_t *msg);
 ZMQ_EXPORT int zmq_msg_set_group (zmq_msg_t *msg, const char *group);
 ZMQ_EXPORT const char *zmq_msg_group (zmq_msg_t *msg);
+ZMQ_EXPORT int
+zmq_msg_init_buffer (zmq_msg_t *msg_, const void *buf_, size_t size_);
 
 /*  DRAFT Msg property names.                                                 */
 #define ZMQ_MSG_PROPERTY_ROUTING_ID "Routing-Id"
@@ -690,12 +717,6 @@ ZMQ_EXPORT const char *zmq_msg_group (zmq_msg_t *msg);
 
 #define ZMQ_HAVE_POLLER
 
-#if defined _WIN32
-typedef SOCKET zmq_fd_t;
-#else
-typedef int zmq_fd_t;
-#endif
-
 typedef struct zmq_poller_event_t
 {
     void *socket;
@@ -706,6 +727,7 @@ typedef struct zmq_poller_event_t
 
 ZMQ_EXPORT void *zmq_poller_new (void);
 ZMQ_EXPORT int zmq_poller_destroy (void **poller_p);
+ZMQ_EXPORT int zmq_poller_size (void *poller);
 ZMQ_EXPORT int
 zmq_poller_add (void *poller, void *socket, void *user_data, short events);
 ZMQ_EXPORT int zmq_poller_modify (void *poller, void *socket, short events);
@@ -739,6 +761,19 @@ ZMQ_EXPORT int zmq_socket_get_peer_state (void *socket,
 ZMQ_EXPORT int zmq_socket_monitor_versioned (
   void *s_, const char *addr_, uint64_t events_, int event_version_, int type_);
 ZMQ_EXPORT int zmq_socket_monitor_pipes_stats (void *s);
+
+#if !defined _WIN32
+ZMQ_EXPORT int zmq_ppoll (zmq_pollitem_t *items_,
+                          int nitems_,
+                          long timeout_,
+                          const sigset_t *sigmask_);
+#else
+// Windows has no sigset_t
+ZMQ_EXPORT int zmq_ppoll (zmq_pollitem_t *items_,
+                          int nitems_,
+                          long timeout_,
+                          const void *sigmask_);
+#endif
 
 #endif // ZMQ_BUILD_DRAFT_API
 
