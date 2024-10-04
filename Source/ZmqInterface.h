@@ -31,19 +31,20 @@
 
 #include <queue>
 
-struct ZmqApplication {
+struct ZmqApplication
+{
     String name;
     String Uuid;
     time_t lastSeen;
     bool alive;
 };
 
-class ZmqInterface    : public GenericProcessor, public Thread, public Timer
+class ZmqInterface : public GenericProcessor, public Thread, public Timer
 {
 public:
     /** The class constructor, used to initialize any members. */
-    ZmqInterface(const String &processorName = "ZMQ Interface");
-    
+    ZmqInterface (const String& processorName = "ZMQ Interface");
+
     /** The class destructor, used to deallocate memory */
     ~ZmqInterface();
 
@@ -52,18 +53,18 @@ public:
 
     /** Creates the custom editor*/
     AudioProcessorEditor* createEditor();
-    
+
     /** Streams incoming data over a ZMQ socket */
-    void process(AudioBuffer<float>& continuousBuffer);
+    void process (AudioBuffer<float>& continuousBuffer);
 
     /** Called whenever the settings of upstream plugins have changed */
     void updateSettings() override;
 
     /** Called when a parameter is updated*/
-    void parameterValueChanged(Parameter* param) override;
+    void parameterValueChanged (Parameter* param) override;
 
     /** Returns a list of connected applications */
-    OwnedArray<ZmqApplication> *getApplicationList();
+    OwnedArray<ZmqApplication>* getApplicationList();
 
     uint16 selectedStream;
     String selectedStreamName;
@@ -71,7 +72,6 @@ public:
     float selectedStreamSampleRate;
 
 private:
-
     /** Runs the ZMQ polling thread*/
     void run();
 
@@ -98,29 +98,29 @@ private:
 
     /** Called at the start of acquisition */
     bool startAcquisition();
-    
+
     /** Called at the end of acquisition */
     bool stopAcquisition();
 
     /** Called whenever a new TTL event arrives */
-    void handleTTLEvent(TTLEventPtr event) override;
+    void handleTTLEvent (TTLEventPtr event) override;
 
     /** Called whenever a new spike arrives */
     void handleSpike (SpikePtr spike) override;
 
     /** Sends continuous data for one channel over the ZMQ socket */
-    int sendData(float *data, int channelNum, int nSamples, int64 sampleNumber, float sampleRate);
+    int sendData (float* data, int channelNum, int nSamples, int64 sampleNumber, float sampleRate);
 
     /** Sends an event over the ZMQ socket */
-    int sendEvent( uint8 type,
-                  int64 sampleNum,
-                  int sourceNodeId,
-                  size_t numBytes,
-                  const uint8* eventData);
+    int sendEvent (uint8 type,
+                   int64 sampleNum,
+                   int sourceNodeId,
+                   size_t numBytes,
+                   const uint8* eventData);
 
     /** Sends a spike over the ZMQ socket */
-    int sendSpikeEvent(const SpikePtr spike);
-    
+    int sendSpikeEvent (const SpikePtr spike);
+
     /** Currently only supports events related to keeping track of connected applications */
     int receiveEvents();
 
@@ -129,17 +129,17 @@ private:
 
     /** Calls checkForApplications() */
     void timerCallback();
-    
-    void *context;
-    void *socket;
-    void *listenSocket;
-    void *controlSocket;
-    void *killSocket;
-    void *pipeInSocket;
-    void *pipeOutSocket;
-    
+
+    void* context;
+    void* socket;
+    void* listenSocket;
+    void* controlSocket;
+    void* killSocket;
+    void* pipeInSocket;
+    void* pipeOutSocket;
+
     OwnedArray<ZmqApplication> applications;
-    
+
     int messageNumber;
     int dataPort;
     int listenPort;
@@ -147,9 +147,7 @@ private:
     Array<int> selectedChannels;
     std::map<uint16, String> streamNamesMap;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ZmqInterface);
-    
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ZmqInterface);
 };
 
-
-#endif  // ZMQINTERFACE_H_INCLUDED
+#endif // ZMQINTERFACE_H_INCLUDED

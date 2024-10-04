@@ -27,49 +27,44 @@
 #include "ZmqInterfaceEditor.h"
 #include "ZmqInterface.h"
 
-class ZmqInterfaceEditor::ZmqInterfaceEditorListBox: public ListBox,
-private ListBoxModel, public AsyncUpdater
+class ZmqInterfaceEditor::ZmqInterfaceEditorListBox : public ListBox,
+                                                      private ListBoxModel,
+                                                      public AsyncUpdater
 {
 public:
-    
-    ZmqInterfaceEditorListBox(const String noItemsText, ZmqInterfaceEditor *e):
-        ListBox(String(), nullptr), noItemsMessage(noItemsText)
+    ZmqInterfaceEditorListBox (const String noItemsText, ZmqInterfaceEditor* e) : ListBox (String(), nullptr), noItemsMessage (noItemsText)
     {
         editor = e;
-        setModel(this);
+        setModel (this);
         setRowHeight (18);
         setOutlineThickness (1);
-        
-        refresh();
 
+        refresh();
     }
-    
+
     void handleAsyncUpdate()
     {
         refresh();
     }
-    
+
     void refresh()
     {
         updateContent();
         repaint();
-        
     }
-    
+
     int getNumRows() override
     {
         return editor->getApplicationList()->size();
     }
-    
-    
+
     void paintListBoxItem (int row, Graphics& g, int width, int height, bool rowIsSelected) override
     {
-        
-        OwnedArray<ZmqApplication> *items = editor->getApplicationList();
-        
+        OwnedArray<ZmqApplication>* items = editor->getApplicationList();
+
         if (isPositiveAndBelow (row, items->size()))
         {
-            g.fillAll(findColour (ThemeColours::widgetBackground));
+            g.fillAll (findColour (ThemeColours::widgetBackground));
 
             if (rowIsSelected)
             {
@@ -77,26 +72,25 @@ public:
                 g.drawRect (1, 1, width - 2, height - 2, 1);
             }
 
-            ZmqApplication *i = (*items)[row];
+            ZmqApplication* i = (*items)[row];
             const String item (i->name); // TODO change when we put a map
-                
+
             const int x = getTickX();
-            
+
             g.setFont (height * 0.7f);
             if (i->alive)
-                g.setColour(Colours::green);
+                g.setColour (Colours::green);
             else
-                g.setColour(Colours::red);
+                g.setColour (Colours::red);
             g.drawText (item, 5, 0, width, height, Justification::centredLeft, true);
         } // end of function
     }
-    
-    
+
     void listBoxItemClicked (int row, const MouseEvent& e) override
     {
         selectRow (row);
     }
-    
+
     void paintOverChildren (Graphics& g) override
     {
         ListBox::paintOverChildren (g);
@@ -105,61 +99,64 @@ public:
         {
             g.setColour (findColour (ThemeColours::defaultText));
             g.setFont (14.0f);
-        
-            if (!CoreServices::getAcquisitionStatus())
+
+            if (! CoreServices::getAcquisitionStatus())
             {
                 g.drawText ("Waiting...",
-                            10, 0, getWidth(), getHeight() / 2,
-                            Justification::centredLeft, true);
+                            10,
+                            0,
+                            getWidth(),
+                            getHeight() / 2,
+                            Justification::centredLeft,
+                            true);
             }
             else
             {
                 g.drawText (noItemsMessage,
-                        10, 0, getWidth(), getHeight() / 2,
-                        Justification::centredLeft, true);
+                            10,
+                            0,
+                            getWidth(),
+                            getHeight() / 2,
+                            Justification::centredLeft,
+                            true);
             }
         }
     }
-    
+
 private:
     const String noItemsMessage;
-    ZmqInterfaceEditor *editor;
-    /** Stores the editor's background color. */
-    Colour backgroundColor;
-    
-    /** Stores the editor's background gradient. */
-    ColourGradient backgroundGradient;
-    
+    ZmqInterfaceEditor* editor;
+
     int getTickX() const
     {
         return getRowHeight() + 5;
     }
-    
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ZmqInterfaceEditorListBox)
 };
 
-ZmqInterfaceEditor::ZmqInterfaceEditor(GenericProcessor *parentNode): GenericEditor(parentNode)
+ZmqInterfaceEditor::ZmqInterfaceEditor (GenericProcessor* parentNode) : GenericEditor (parentNode)
 {
-    ZmqProcessor = (ZmqInterface *)parentNode;
+    ZmqProcessor = (ZmqInterface*) parentNode;
 
     desiredWidth = 280;
 
-    listBox = std::make_unique<ZmqInterfaceEditorListBox>(String("None"), this);
-    listBox->setBounds(120,45,155,80);
-    addAndMakeVisible(listBox.get());
+    listBox = std::make_unique<ZmqInterfaceEditorListBox> (String ("None"), this);
+    listBox->setBounds (120, 45, 155, 80);
+    addAndMakeVisible (listBox.get());
 
-    listTitle = std::make_unique<Label>("ListBox Label", "Connected apps:");
-    listTitle->setBounds(120,27,155,15);
-    listTitle->setFont(FontOptions("Inter", "Semi Bold", 14.0f));
-    addAndMakeVisible(listTitle.get());
+    listTitle = std::make_unique<Label> ("ListBox Label", "Connected apps:");
+    listTitle->setBounds (120, 27, 155, 15);
+    listTitle->setFont (FontOptions ("Inter", "Semi Bold", 14.0f));
+    addAndMakeVisible (listTitle.get());
 
     addSelectedStreamParameterEditor (Parameter::PROCESSOR_SCOPE, "stream", 10, 22);
 
-    addMaskChannelsParameterEditor(Parameter::STREAM_SCOPE, "channels", 10, 56);
+    addMaskChannelsParameterEditor (Parameter::STREAM_SCOPE, "channels", 10, 56);
 
-    addTextBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "data_port", 10, 90);
+    addTextBoxParameterEditor (Parameter::PROCESSOR_SCOPE, "data_port", 10, 90);
 
-    for (auto ed: parameterEditors)
+    for (auto ed : parameterEditors)
     {
         ed->setLayout (ParameterEditor::Layout::nameOnTop);
         ed->setSize (100, 34);
@@ -168,7 +165,6 @@ ZmqInterfaceEditor::ZmqInterfaceEditor(GenericProcessor *parentNode): GenericEdi
 
 ZmqInterfaceEditor::~ZmqInterfaceEditor()
 {
-
 }
 
 void ZmqInterfaceEditor::refreshListAsync()
@@ -186,9 +182,8 @@ void ZmqInterfaceEditor::stopAcquisition()
     listBox->refresh();
 }
 
-OwnedArray<ZmqApplication> *ZmqInterfaceEditor::getApplicationList()
+OwnedArray<ZmqApplication>* ZmqInterfaceEditor::getApplicationList()
 {
-    OwnedArray<ZmqApplication> *ar = ZmqProcessor->getApplicationList();
+    OwnedArray<ZmqApplication>* ar = ZmqProcessor->getApplicationList();
     return ar;
-    
 }

@@ -25,7 +25,6 @@
  
  */
 
-
 /*
   ==============================================================================
 
@@ -44,12 +43,11 @@ class ZmqInterface;
 
 struct ZmqApplication;
 
-class ZmqInterfaceEditor: public GenericEditor
+class ZmqInterfaceEditor : public GenericEditor
 {
 public:
-
     /** Constructor */
-    ZmqInterfaceEditor(GenericProcessor *parentNode);
+    ZmqInterfaceEditor (GenericProcessor* parentNode);
 
     /** Destructor */
     virtual ~ZmqInterfaceEditor();
@@ -66,13 +64,12 @@ public:
 private:
     class ZmqInterfaceEditorListBox;
 
-    OwnedArray<ZmqApplication> *getApplicationList();
-    ZmqInterface *ZmqProcessor;
+    OwnedArray<ZmqApplication>* getApplicationList();
+    ZmqInterface* ZmqProcessor;
     std::unique_ptr<ZmqInterfaceEditorListBox> listBox;
     std::unique_ptr<Label> listTitle;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ZmqInterfaceEditor)
-    
 };
 
-#endif  // ZMQINTERFACEEDITOR_H_INCLUDED
+#endif // ZMQINTERFACEEDITOR_H_INCLUDED
