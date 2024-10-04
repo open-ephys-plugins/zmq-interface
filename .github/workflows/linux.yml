@@ -13,12 +13,24 @@ jobs:
         os: [ubuntu-20.04]
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: set env vars
+      run: |
+        if [ ${{github.ref_name}} == 'juce8' ]; then
+          echo "GUI_BRANCH=development-juce8" >> "$GITHUB_ENV"
+        elif [ ${{github.ref_name}} == 'testing-juce8' ]; then
+          echo "GUI_BRANCH=testing-juce8" >> "$GITHUB_ENV"
+        else
+          echo "Invalid branch : ${{github.ref_name}}"
+          exit 1
+        fi
     - name: setup
       run: |
         sudo apt update
         cd ../..
-        git clone https://github.com/open-ephys/plugin-GUI.git --branch main
+        git clone https://github.com/open-ephys/plugin-GUI.git --branch $GUI_BRANCH
         sudo ./plugin-GUI/Resources/Scripts/install_linux_dependencies.sh
         cd plugin-GUI/Build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ..
     - name: build
@@ -29,14 +41,14 @@ jobs:
 #    - name: test
 #      run: cd build && ctest
     - name: deploy
-      if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/testing-juce8'
       env:
         artifactoryApiKey: ${{ secrets.artifactoryApiKey }}
         build_dir: "Build"
         package: ZMQInterface-linux
       run: |
         plugin_api=$(grep -rnw ../../plugin-GUI/Source -e '#define PLUGIN_API_VER' | grep -Eo "[0-9]*" | tail -1)
-        tag=$(git describe --tags $(git rev-list --tags --max-count=1))
+        tag=$(grep -w Source/OpenEphysLib.cpp -e 'info->libVersion' | grep -Eo "[0-9]+.[0-9]+.[0-9]+")
         new_plugin_ver=$tag-API$plugin_api
         mkdir plugins 
         cp -r $build_dir/*.so plugins

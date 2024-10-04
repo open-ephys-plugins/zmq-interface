@@ -13,11 +13,26 @@ jobs:
         os: [macos-latest]
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: set env vars
+      run: |
+        if [ ${{github.ref_name}} == 'juce8' ]; then
+          echo "GUI_BRANCH=development-juce8" >> "$GITHUB_ENV"
+        elif [ ${{github.ref_name}} == 'testing-juce8' ]; then
+          echo "GUI_BRANCH=testing-juce8" >> "$GITHUB_ENV"
+        else
+          echo "Invalid branch : ${{github.ref_name}}"
+          exit 1
+        fi
+    - uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
     - name: setup
       run: |
         cd ../..
-        git clone https://github.com/open-ephys/plugin-GUI.git --branch main
+        git clone https://github.com/open-ephys/plugin-GUI.git --branch $GUI_BRANCH
         cd plugin-GUI/Build && cmake -G "Xcode" ..
     - name: build
       run: |
@@ -27,19 +42,75 @@ jobs:
 #    - name: test
 #      run: cd build && ctest
     - name: deploy
-      if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/testing-juce8'
       env:
         artifactoryApiKey: ${{ secrets.artifactoryApiKey }}
+        MACOS_CERTIFICATE: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+        MACOS_CERTIFICATE_PWD: ${{ secrets.BUILD_CERTIFICATE_PWD }}
+        MACOS_CERTIFICATE_NAME: ${{ secrets.BUILD_CERTIFICATE_NAME }}
+        MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
+        PROD_MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.PROD_MACOS_NOTARIZATION_APPLE_ID }}
+        PROD_MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.PROD_MACOS_NOTARIZATION_TEAM_ID }}
+        PROD_MACOS_NOTARIZATION_PWD: ${{ secrets.PROD_MACOS_NOTARIZATION_PWD }}
         build_dir: "Build/Release"
         package: ZMQInterface-mac
       run: |
         plugin_api=$(grep -rnw ../../plugin-GUI/Source -e '#define PLUGIN_API_VER' | grep -Eo "[0-9]" | tail -1)
-        tag=$(git describe --tags $(git rev-list --tags --max-count=1))
+        tag=$(grep -w Source/OpenEphysLib.cpp -e 'info->libVersion' | grep -Eo "[0-9]+.[0-9]+.[0-9]+")
         new_plugin_ver=$tag-API$plugin_api
+
         mkdir plugins 
         cp -r $build_dir/*.bundle plugins
-        mkdir shared	
+
+        mkdir shared 
         cp -r libs/macos/bin/* shared
+
+        # Turn our base64-encoded certificate back to a regular .p12 file
+        echo $MACOS_CERTIFICATE | base64 --decode > certificate.p12
+
+        # We need to create a new keychain, otherwise using the certificate will prompt
+        # with a UI dialog asking for the certificate password, which we can't
+        # use in a headless CI environment
+        security create-keychain -p $MACOS_CI_KEYCHAIN_PWD build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p $MACOS_CI_KEYCHAIN_PWD build.keychain
+        security import certificate.p12 -k build.keychain -P $MACOS_CERTIFICATE_PWD -T /usr/bin/codesign
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $MACOS_CI_KEYCHAIN_PWD build.keychain
+        /usr/bin/codesign --force -s "$MACOS_CERTIFICATE_NAME" -v plugins/zmq-interface.bundle --deep --strict --timestamp --options=runtime
+        /usr/bin/codesign --force -s "$MACOS_CERTIFICATE_NAME" -v shared/libzmq.5.dylib --deep --strict --timestamp --options=runtime
+
+        /usr/bin/codesign -dv --verbose=4 plugins/zmq-interface.bundle
+
+        # Store the notarization credentials so that we can prevent a UI password dialog from blocking the CI
+
+        echo "Create keychain profile"
+        xcrun notarytool store-credentials "notarytool-profile" --apple-id "$PROD_MACOS_NOTARIZATION_APPLE_ID" --team-id "$PROD_MACOS_NOTARIZATION_TEAM_ID" --password "$PROD_MACOS_NOTARIZATION_PWD"
+
+        # We can't notarize an app bundle directly, but we need to compress it as an archive.
+        # Therefore, we create a zip file containing our app bundle, so that we can send it to the
+        # notarization service
+
+        echo "Creating temp notarization archive"
+        /usr/bin/ditto -c -k --sequesterRsrc --keepParent  plugins/zmq-interface.bundle zmq-interface.zip
+
+        # Here we send the notarization request to the Apple's Notarization service, waiting for the result.
+        # This typically takes a few seconds inside a CI environment, but it might take more depending on the App
+        # characteristics. Visit the Notarization docs for more information and strategies on how to optimize it if
+        # you're curious
+
+        echo "Notarize app"
+        xcrun notarytool submit "zmq-interface.zip" --keychain-profile "notarytool-profile" --wait
+
+        # Finally, we need to "attach the staple" to our executable, which will allow our app to be
+        # validated by macOS even when an internet connection is not available.
+        echo "Attach staple"
+        rm -r plugins/*
+        /usr/bin/ditto -x -k zmq-interface.zip plugins
+        xcrun stapler staple plugins/zmq-interface.bundle
+
+        spctl -vvv --assess --type exec plugins/zmq-interface.bundle
+
         zipfile=${package}_${new_plugin_ver}.zip
-        zip -r -X $zipfile plugins shared
+        /usr/bin/ditto -c -k --sequesterRsrc --keepParent plugins $zipfile
+        /usr/bin/ditto -c -k --sequesterRsrc --keepParent shared $zipfile
         curl -H "X-JFrog-Art-Api:$artifactoryApiKey" -T $zipfile "https://openephys.jfrog.io/artifactory/ZMQInterface-plugin/mac/$zipfile"
