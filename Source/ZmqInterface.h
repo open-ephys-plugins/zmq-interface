@@ -47,6 +47,9 @@ public:
     /** The class destructor, used to deallocate memory */
     ~ZmqInterface();
 
+    /** Registers the parameters of the processor */
+    void registerParameters() override;
+
     /** Creates the custom editor*/
     AudioProcessorEditor* createEditor();
     

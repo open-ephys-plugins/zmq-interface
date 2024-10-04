@@ -37,14 +37,8 @@ public:
     {
         editor = e;
         setModel(this);
-        
-        backgroundGradient = ColourGradient(Colour(220, 220, 220), 0.0f, 0.0f,
-                                            Colour(195, 195, 195), 0.0f, 120.0f, false);
-        backgroundGradient.addColour(0.2f, Colour(185, 185, 185));
-        
-        backgroundColor = Colour(155, 155, 155);
-        
-        setColour(backgroundColourId, backgroundColor);
+        setRowHeight (18);
+        setOutlineThickness (1);
         
         refresh();
 
@@ -75,11 +69,14 @@ public:
         
         if (isPositiveAndBelow (row, items->size()))
         {
-            g.fillAll(Colour(155, 155, 155));
+            g.fillAll(findColour (ThemeColours::widgetBackground));
+
             if (rowIsSelected)
-                g.fillAll (findColour (TextEditor::highlightColourId)
-                           .withMultipliedAlpha (0.3f));
-            
+            {
+                g.setColour (findColour (ThemeColours::highlightedFill));
+                g.drawRect (1, 1, width - 2, height - 2, 1);
+            }
+
             ZmqApplication *i = (*items)[row];
             const String item (i->name); // TODO change when we put a map
                 
@@ -90,7 +87,7 @@ public:
                 g.setColour(Colours::green);
             else
                 g.setColour(Colours::red);
-            g.drawText (item, 10, 0, width - x - 2, height, Justification::centredLeft, true);
+            g.drawText (item, 5, 0, width, height, Justification::centredLeft, true);
         } // end of function
     }
     
@@ -102,9 +99,11 @@ public:
     
     void paintOverChildren (Graphics& g) override
     {
+        ListBox::paintOverChildren (g);
+
         if (editor->getApplicationList()->size() == 0)
         {
-            g.setColour (Colours::darkgrey);
+            g.setColour (findColour (ThemeColours::defaultText));
             g.setFont (14.0f);
         
             if (!CoreServices::getAcquisitionStatus())
@@ -146,25 +145,25 @@ ZmqInterfaceEditor::ZmqInterfaceEditor(GenericProcessor *parentNode): GenericEdi
     desiredWidth = 280;
 
     listBox = std::make_unique<ZmqInterfaceEditorListBox>(String("None"), this);
-    listBox->setBounds(112,45,160,80);
+    listBox->setBounds(120,45,155,80);
     addAndMakeVisible(listBox.get());
 
     listTitle = std::make_unique<Label>("ListBox Label", "Connected apps:");
-    listTitle->setColour(Label::textColourId, Colours::black);
-    listTitle->setBounds(112,27,160,15);
-    listTitle->setFont(Font("Fira Code", "SemiBold", 14.0f));
+    listTitle->setBounds(120,27,155,15);
+    listTitle->setFont(FontOptions("Inter", "Semi Bold", 14.0f));
     addAndMakeVisible(listTitle.get());
 
-    addComboBoxParameterEditor("Stream", 15, 22);
-    parameterEditors.getLast()->setBounds(15, 22, 120, 42);
-    
-    // addSelectedChannelsParameterEditor("Channels", 10, 67);
-    Parameter* maskChansParam = getProcessor()->getParameter("Channels");
-    maskchannelsEditor = std::make_unique<MaskChannelsParameterEditor>(maskChansParam);
-    maskchannelsEditor->setBounds(15, 67, maskchannelsEditor->getWidth(), maskchannelsEditor->getHeight());
-    addAndMakeVisible(maskchannelsEditor.get());
-    
-    addTextBoxParameterEditor("data_port", 15, 87);
+    addSelectedStreamParameterEditor (Parameter::PROCESSOR_SCOPE, "stream", 10, 22);
+
+    addMaskChannelsParameterEditor(Parameter::STREAM_SCOPE, "channels", 10, 56);
+
+    addTextBoxParameterEditor(Parameter::PROCESSOR_SCOPE, "data_port", 10, 90);
+
+    for (auto ed: parameterEditors)
+    {
+        ed->setLayout (ParameterEditor::Layout::nameOnTop);
+        ed->setSize (100, 34);
+    }
 }
 
 ZmqInterfaceEditor::~ZmqInterfaceEditor()
@@ -192,9 +191,4 @@ OwnedArray<ZmqApplication> *ZmqInterfaceEditor::getApplicationList()
     OwnedArray<ZmqApplication> *ar = ZmqProcessor->getApplicationList();
     return ar;
     
-}
-
-void ZmqInterfaceEditor::updateMaskChannelsParameter(Parameter* param)
-{
-    maskchannelsEditor->setParameter(param);
 }

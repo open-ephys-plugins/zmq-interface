@@ -68,17 +68,11 @@ ZmqInterface::ZmqInterface(const String& processorName)
     selectedStreamSourceNodeId = 0;
     selectedStreamName = "";
     selectedStreamSampleRate = 0.0f;
-    
-    addMaskChannelsParameter(Parameter::STREAM_SCOPE, "Channels", "The input channel data to send");
-
-    addCategoricalParameter(Parameter::GLOBAL_SCOPE, "Stream", "The stream to send data from", StringArray("None"), 0, true);
-
-    addIntParameter(Parameter::GLOBAL_SCOPE, "data_port", "Port number to send data", dataPort, 1000, 65535, true);
 
     createContext();
     
-    //openListenSocket();
-    //openDataSocket();
+    openListenSocket();
+    openDataSocket();
     openKillSocket();
     openPipeOutSocket();
 
@@ -109,6 +103,12 @@ ZmqInterface::~ZmqInterface()
     }
 }
 
+void ZmqInterface::registerParameters()
+{
+    addMaskChannelsParameter(Parameter::STREAM_SCOPE, "channels", "Channels", "The input channels data to send");
+    addSelectedStreamParameter (Parameter::PROCESSOR_SCOPE, "stream", "Stream", "The selected stream to send data from", {}, 0, true, true);
+    addIntParameter(Parameter::PROCESSOR_SCOPE, "data_port", "Data Port", "Port number to send data", dataPort, 1000, 65535, true);
+}
 
 AudioProcessorEditor* ZmqInterface::createEditor()
 {
@@ -735,55 +735,25 @@ void ZmqInterface::process(AudioBuffer<float>& buffer)
 
 void ZmqInterface::updateSettings()
 {
-    streamNamesMap.clear();
-    StringArray streamNames;
 
-    for(auto stream : getDataStreams())
-    {
-        streamNamesMap.emplace(stream->getStreamId(), stream->getName());
-        String streamString = stream->getName() + "[" + String(stream->getSourceNodeId()) + "]";
-        streamNames.add(streamString);
-    }
-
-    static_cast<CategoricalParameter*>(getParameter("Stream"))->setCategories(streamNames);
-    getEditor()->updateView();
-
-    parameterValueChanged(getParameter("Stream"));
-
-    openListenSocket();
-    openDataSocket();
 }
 
 
 void ZmqInterface::parameterValueChanged(Parameter* param)
 {    
-    if (param->getName().equalsIgnoreCase("Channels"))
+    if (param->getName().equalsIgnoreCase("channels"))
     {   
         if(param->getStreamId() == selectedStream)
             selectedChannels = static_cast<MaskChannelsParameter*>(param)->getArrayValue();
     }
-    else if (param->getName().equalsIgnoreCase("Stream"))
+    else if (param->getName().equalsIgnoreCase("stream"))
     {   
-        String streamName = static_cast<CategoricalParameter*>(param)->getSelectedString().upToFirstOccurrenceOf("[", false, false);
+        String streamKey = param->getValueAsString();
 
-        // Update the selected stream's ID and the mask channels parameter
-        for (const auto& pair : streamNamesMap)
-        {
-            if(pair.second.equalsIgnoreCase(streamName))
-            {
-                selectedStream = pair.first;
-                selectedStreamName = getDataStream(selectedStream)->getName();
-                selectedStreamSourceNodeId = getDataStream(selectedStream)->getSourceNodeId();
-                selectedStreamSampleRate = getDataStream(selectedStream)->getSampleRate();
-                
-                Parameter* p =  getDataStream(selectedStream)->getParameter("Channels");
-                auto editor = static_cast<ZmqInterfaceEditor*>(getEditor());
-                editor->updateMaskChannelsParameter(p);
-                parameterValueChanged(p);
-
-                break;
-            }
-        }
+        selectedStream = getDataStream (streamKey)->getStreamId();
+        selectedStreamName = getDataStream(streamKey)->getName();
+        selectedStreamSourceNodeId = getDataStream(streamKey)->getSourceNodeId();
+        selectedStreamSampleRate = getDataStream(streamKey)->getSampleRate();
     }
     else if (param->getName().equalsIgnoreCase("data_port"))
     {

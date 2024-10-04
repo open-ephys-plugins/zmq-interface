@@ -63,9 +63,6 @@ public:
     /** Updates list of connected apps */
     void stopAcquisition() override;
 
-    /** Sets pointer to mask channels underlying parameter */
-    void updateMaskChannelsParameter(Parameter* param);
-
 private:
     class ZmqInterfaceEditorListBox;
 
@@ -73,8 +70,6 @@ private:
     ZmqInterface *ZmqProcessor;
     std::unique_ptr<ZmqInterfaceEditorListBox> listBox;
     std::unique_ptr<Label> listTitle;
-
-    std::unique_ptr<MaskChannelsParameterEditor> maskchannelsEditor;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ZmqInterfaceEditor)
     
