@@ -14,8 +14,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
     - name: set env vars
       run: |
         if [ ${{github.ref_name}} == 'juce8' ]; then
@@ -43,7 +41,7 @@ jobs:
     - name: deploy
       if: github.ref == 'refs/heads/testing-juce8'
       env:
-        artifactoryApiKey: ${{ secrets.artifactoryApiKey }}
+        ARTIFACTORY_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
         build_dir: "Build"
         package: ZMQInterface-linux
       run: |
@@ -56,4 +54,4 @@ jobs:
         cp -r libs/linux/bin/* shared
         zipfile=${package}_${new_plugin_ver}.zip
         zip -r -X $zipfile plugins shared
-        curl -H "X-JFrog-Art-Api:$artifactoryApiKey" -T $zipfile "https://openephys.jfrog.io/artifactory/ZMQInterface-plugin/linux/$zipfile"
+        curl -H "X-JFrog-Art-Api:$ARTIFACTORY_ACCESS_TOKEN" -T $zipfile "https://openephys.jfrog.io/artifactory/ZMQInterface-plugin/linux/$zipfile"
