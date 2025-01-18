@@ -70,9 +70,6 @@ ZmqInterface::ZmqInterface (const String& processorName)
     selectedStreamSampleRate = 0.0f;
 
     createContext();
-
-    openListenSocket();
-    openDataSocket();
     openKillSocket();
     openPipeOutSocket();
 }
@@ -113,6 +110,15 @@ AudioProcessorEditor* ZmqInterface::createEditor()
 {
     editor = std::make_unique<ZmqInterfaceEditor> (this);
     return editor.get();
+}
+
+void ZmqInterface::initialize (bool signalChainIsLoading)
+{
+    if (! signalChainIsLoading)
+    {
+        openListenSocket();
+        openDataSocket();
+    }
 }
 
 OwnedArray<ZmqApplication>* ZmqInterface::getApplicationList()
@@ -181,6 +187,7 @@ void ZmqInterface::openListenSocket()
 
         if (rc != 0) // port is taken
         {
+            LOGE ("Couldn't open listen socket: ", zmq_strerror (zmq_errno()));
             dataPort += 2;
             listenPort = dataPort + 1;
 

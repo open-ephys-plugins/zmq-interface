@@ -54,6 +54,9 @@ public:
     /** Creates the custom editor*/
     AudioProcessorEditor* createEditor();
 
+    /** Initializes the ZMQ interface */
+    void initialize (bool signalChainIsLoading) override;
+
     /** Streams incoming data over a ZMQ socket */
     void process (AudioBuffer<float>& continuousBuffer);
 
