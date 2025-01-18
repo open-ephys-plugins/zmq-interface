@@ -26,13 +26,13 @@
  
  */
 
-#include <zmq.h>
-#include <string.h>
-#include <iostream>
-#include <time.h>
-#include <errno.h>
 #include "ZmqInterface.h"
 #include "ZmqInterfaceEditor.h"
+#include <errno.h>
+#include <iostream>
+#include <string.h>
+#include <time.h>
+#include <zmq.h>
 
 #define DEBUG_ZMQ
 const int MAX_MESSAGE_LENGTH = 64000;
@@ -327,10 +327,6 @@ void ZmqInterface::run()
             zmq_send (listenSocket, response.getCharPointer(), response.length(), 0);
         }
     }
-    
-    
-
-
 
     delete[] buffer;
 
@@ -548,11 +544,7 @@ int ZmqInterface::sendEvent (uint8 type,
     String s = JSON::toString (json);
     void* headerData = (void*) s.toRawUTF8();
     size_t headerSize = s.length();
-    
-    
-  
 
-  
     zmq_msg_t messageEnvelope;
     zmq_msg_init_size (&messageEnvelope, strlen ("EVENT") + 1);
     memcpy (zmq_msg_data (&messageEnvelope), "EVENT", strlen ("EVENT") + 1);
@@ -712,6 +704,10 @@ void ZmqInterface::process (AudioBuffer<float>& buffer)
 
 void ZmqInterface::updateSettings()
 {
+    if (dataStreams.size() > 0)
+    {
+        parameterValueChanged (getDataStream (selectedStream)->getParameter ("channels"));
+    }
 }
 
 void ZmqInterface::parameterValueChanged (Parameter* param)
@@ -725,10 +721,19 @@ void ZmqInterface::parameterValueChanged (Parameter* param)
     {
         String streamKey = param->getValueAsString();
 
+        if (streamKey.isEmpty())
+            return;
+
         selectedStream = getDataStream (streamKey)->getStreamId();
         selectedStreamName = getDataStream (streamKey)->getName();
         selectedStreamSourceNodeId = getDataStream (streamKey)->getSourceNodeId();
         selectedStreamSampleRate = getDataStream (streamKey)->getSampleRate();
+
+        MaskChannelsParameter* p = (MaskChannelsParameter*) getDataStream (selectedStream)->getParameter ("channels");
+        if (p != nullptr)
+        {
+            selectedChannels = p->getArrayValue();
+        }
     }
     else if (param->getName().equalsIgnoreCase ("data_port"))
     {
