@@ -151,9 +151,12 @@ int ZmqInterface::openDataSocket()
         int rc = zmq_bind (socket, urlstring.toRawUTF8());
         if (rc)
         {
-            LOGE ("Couldn't open data socket");
-            LOGE (zmq_strerror (zmq_errno()));
-            jassert (false);
+            LOGE ("Couldn't open data socket! ", zmq_strerror (zmq_errno()));
+
+            dataPort += 2;
+            listenPort = dataPort + 1;
+
+            getParameter ("data_port")->setNextValue (dataPort, false);
         }
     }
 
@@ -187,11 +190,11 @@ void ZmqInterface::openListenSocket()
 
         if (rc != 0) // port is taken
         {
-            LOGE ("Couldn't open listen socket: ", zmq_strerror (zmq_errno()));
+            LOGE ("Couldn't open listen socket! ", zmq_strerror (zmq_errno()));
             dataPort += 2;
             listenPort = dataPort + 1;
 
-            getParameter ("data_port")->setNextValue (dataPort);
+            getParameter ("data_port")->setNextValue (dataPort, false);
             return;
         }
 
