@@ -26,9 +26,6 @@ jobs:
           echo "Invalid branch : ${{github.ref_name}}"
           exit 1
         fi
-    - uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: latest-stable
     - name: setup
       run: |
         cd ../..
