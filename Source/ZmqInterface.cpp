@@ -114,11 +114,8 @@ AudioProcessorEditor* ZmqInterface::createEditor()
 
 void ZmqInterface::initialize (bool signalChainIsLoading)
 {
-    if (! signalChainIsLoading)
-    {
-        openListenSocket();
-        openDataSocket();
-    }
+    openListenSocket();
+    openDataSocket();
 }
 
 OwnedArray<ZmqApplication>* ZmqInterface::getApplicationList()
