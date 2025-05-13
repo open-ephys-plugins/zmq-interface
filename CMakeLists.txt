@@ -71,7 +71,7 @@ if(MSVC)
 elseif(LINUX)
 	target_link_libraries(${PLUGIN_NAME} GL X11 Xext Xinerama asound dl freetype pthread rt)
 	set_property(TARGET ${PLUGIN_NAME} APPEND_STRING PROPERTY LINK_FLAGS
-		"-fvisibility=hidden -fPIC -rdynamic -Wl,-rpath='$ORIGIN/../shared' -Wl,-rpath='$ORIGIN/../shared-api9'")
+		"-fvisibility=hidden -fPIC -rdynamic -Wl,-rpath='$ORIGIN/../shared' -Wl,-rpath='$ORIGIN/../shared-api10'")
 	target_compile_options(${PLUGIN_NAME} PRIVATE -fPIC -rdynamic)
 	target_compile_options(${PLUGIN_NAME} PRIVATE -O3) #enable optimization for linux debug
 	
@@ -80,7 +80,7 @@ elseif(LINUX)
 elseif(APPLE)
 	set_target_properties(${PLUGIN_NAME} PROPERTIES BUNDLE TRUE)
 	set_property(TARGET ${PLUGIN_NAME} APPEND_STRING PROPERTY LINK_FLAGS
-	"-undefined dynamic_lookup -rpath @loader_path/../../../../shared-api9")
+	"-undefined dynamic_lookup -rpath @loader_path/../../../../shared-api10")
 
 	set_target_properties(${PLUGIN_NAME} PROPERTIES
 		XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
@@ -90,7 +90,7 @@ elseif(APPLE)
 	# install_name_tool -change "/usr/local/lib/libzmq.5.dylib" "@rpath/libzmq.5.dylib"
 	# $<TARGET_FILE:${PLUGIN_NAME}>)
 
-	install(TARGETS ${PLUGIN_NAME} DESTINATION $ENV{HOME}/Library/Application\ Support/open-ephys/plugins-api9)
+	install(TARGETS ${PLUGIN_NAME} DESTINATION $ENV{HOME}/Library/Application\ Support/open-ephys/plugins-api10)
 	set(CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libs/macos)
 endif()
 
@@ -109,7 +109,7 @@ if (MSVC)
 elseif(LINUX)
 	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/libs/linux/bin/ DESTINATION ${GUI_BIN_DIR}/shared)
 elseif(APPLE)
-	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/libs/macos/bin/ DESTINATION $ENV{HOME}/Library/Application\ Support/open-ephys/shared-api9)
+	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/libs/macos/bin/ DESTINATION $ENV{HOME}/Library/Application\ Support/open-ephys/shared-api10)
 endif()
 
 #additional libraries, if needed
