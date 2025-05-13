@@ -52,7 +52,7 @@ jobs:
         build_dir: "Build/Release"
         package: ZMQInterface-mac
       run: |
-        plugin_api=$(grep -rnw ../../plugin-GUI/Source -e '#define PLUGIN_API_VER' | grep -Eo "[0-9]" | tail -1)
+        plugin_api=$(grep -rnw ../../plugin-GUI/Source -e '#define PLUGIN_API_VER' | grep -Eo "[0-9]*" | tail -1)
         tag=$(grep -w Source/OpenEphysLib.cpp -e 'info->libVersion' | grep -Eo "[0-9]+.[0-9]+.[0-9]+")
         new_plugin_ver=$tag-API$plugin_api
 
