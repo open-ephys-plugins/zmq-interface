@@ -106,7 +106,7 @@ private:
     void handleSpike (SpikePtr spike) override;
 
     /** Sends continuous data for one channel over the ZMQ socket */
-    int sendData(float *data, int channelNum, int nSamples, int64 sampleNumber, float sampleRate);
+    int sendData(float *data, int channelNum, const String& channelName, int nSamples, int64 sampleNumber, float sampleRate);
 
     /** Sends an event over the ZMQ socket */
     int sendEvent( uint8 type,
