@@ -404,6 +404,7 @@ bool ZmqInterface::stopAcquisition()
 
 int ZmqInterface::sendData (float* data,
                             int channelNum,
+                            const String& channelName,
                             int nSamples,
                             int64 sampleNumber,
                             float sampleRate)
@@ -420,6 +421,7 @@ int ZmqInterface::sendData (float* data,
 
     c_obj->setProperty ("stream", selectedStreamName);
     c_obj->setProperty ("channel_num", channelNum);
+    c_obj->setProperty ("channel_name", channelName);
     c_obj->setProperty ("num_samples", nSamples);
     c_obj->setProperty ("sample_num", sampleNumber);
     c_obj->setProperty ("sample_rate", sampleRate);
@@ -690,8 +692,7 @@ void ZmqInterface::process (AudioBuffer<float>& buffer)
 
     for (auto stream : dataStreams)
     {
-        if ((*stream)["enable_stream"]
-            && stream->getStreamId() == selectedStream)
+        if (stream->getStreamId() == selectedStream)
         {
             // Send the sample number of the first sample in the buffer block
             int64 sampleNum = getFirstSampleNumberForBlock (stream->getStreamId());
@@ -700,10 +701,13 @@ void ZmqInterface::process (AudioBuffer<float>& buffer)
             if (numSamples == 0)
                 continue;
 
+            auto contChans = stream->getContinuousChannels();
+
             for (auto chan : selectedChannels)
             {
-                int globalChanIndex = stream->getContinuousChannels().getUnchecked (chan)->getGlobalIndex();
-                sendData (buffer.getWritePointer (globalChanIndex), chan, numSamples, sampleNum, selectedStreamSampleRate);
+                int globalChanIndex = contChans.getUnchecked (chan)->getGlobalIndex();
+                String channelName = contChans.getUnchecked (chan)->getName();
+                sendData (buffer.getWritePointer (globalChanIndex), chan, channelName, numSamples, sampleNum, selectedStreamSampleRate);
             }
         }
     }
